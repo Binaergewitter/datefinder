@@ -2,6 +2,8 @@
 
 A Django web application that helps a group of friends find a common meeting date for recording a podcast.
 
+100% vibe-coded by Claude Opus 4.5
+
 ## Features
 
 - **Keycloak OAuth2 Authentication**: Secure login via Keycloak identity provider
