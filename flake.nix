@@ -63,7 +63,7 @@
             
             # Create wrapper script for running the server
             cat > $out/bin/datefinder-server <<EOF
-#!/usr/bin/env bash
+#!/bin/sh
 set -e
 
 # Set up environment
