@@ -8,6 +8,16 @@
     <p class="subtitle">Create an account to join your podcast team</p>
 </div>
 
+{% if not registration_enabled %}
+<div class="alert alert-error">
+    Registration is currently disabled. Please contact an administrator if you need an account.
+</div>
+
+<div class="auth-links">
+    <p>Already have an account? <a href="{% url 'account_login' %}">Sign in</a></p>
+</div>
+{% else %}
+
 {% if form.errors %}
 <div class="alert alert-error">
     Please correct the errors below.
@@ -99,4 +109,5 @@
 <div class="auth-links">
     <p>Already have an account? <a href="{% url 'account_login' %}">Sign in</a></p>
 </div>
+{% endif %}
 {% endblock %}

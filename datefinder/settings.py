@@ -85,6 +85,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'calendar_app.context_processors.registration_settings',
             ],
         },
     },
@@ -167,6 +168,10 @@ ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
 LOGIN_REDIRECT_URL = '/calendar/'
 LOGOUT_REDIRECT_URL = '/'
 LOGIN_URL = '/accounts/login/'
+
+# Registration settings
+REGISTRATION_ENABLED = os.getenv('REGISTRATION_ENABLED', 'false').lower() == 'true'
+ACCOUNT_ADAPTER = 'calendar_app.adapters.CustomAccountAdapter'
 
 # Keycloak OIDC Provider Configuration
 KEYCLOAK_SERVER_URL = os.getenv('KEYCLOAK_SERVER_URL', '')
