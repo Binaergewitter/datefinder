@@ -100,9 +100,10 @@
         
         .weekday-header {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
+            grid-template-columns: repeat(7, minmax(0, 1fr));
             gap: 5px;
             margin-bottom: 10px;
+            width: 100%;
         }
         
         .weekday {
@@ -110,12 +111,14 @@
             font-weight: 600;
             color: #666;
             padding: 10px;
+            overflow: hidden;
         }
         
         .calendar-grid {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
+            grid-template-columns: repeat(7, minmax(0, 1fr));
             gap: 5px;
+            width: 100%;
         }
         
         .calendar-day {
@@ -127,6 +130,8 @@
             transition: all 0.2s;
             position: relative;
             border: 2px solid transparent;
+            overflow: hidden;
+            min-width: 0;
         }
         
         .calendar-day:hover {
@@ -185,6 +190,7 @@
             font-size: 0.75rem;
             max-height: 70px;
             overflow-y: auto;
+            overflow-x: hidden;
         }
         
         .availability-item {
@@ -194,16 +200,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-        }
-        
-        .availability-item.available {
-            background: #155724;
-            color: white;
-        }
-        
-        .availability-item.tentative {
-            background: #ff8c00;
-            color: white;
+            max-width: 100%;
         }
         
         .legend {
@@ -302,6 +299,72 @@
                 gap: 10px;
                 text-align: center;
             }
+            
+            /* Fix navigation buttons size */
+            .fc .fc-button {
+                padding: 0.3em 0.5em;
+                font-size: 0.85em;
+            }
+            
+            .fc .fc-toolbar {
+                flex-wrap: wrap;
+                gap: 0.5em;
+            }
+            
+            .fc .fc-toolbar-title {
+                font-size: 1.1em;
+            }
+            
+            /* Fix day header alignment */
+            .fc .fc-col-header-cell {
+                padding: 0.25em 0;
+            }
+            
+            .fc .fc-col-header-cell-cushion {
+                padding: 2px;
+                font-size: 0.75em;
+            }
+            
+            /* Ensure grid alignment */
+            .fc .fc-scrollgrid-sync-table {
+                width: 100% !important;
+            }
+            
+            .fc .fc-daygrid-body {
+                width: 100% !important;
+            }
+            
+            .fc .fc-scrollgrid-sync-inner {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            
+            /* Fix column widths to be equal */
+            .fc .fc-col-header,
+            .fc .fc-daygrid-body {
+                width: 100% !important;
+            }
+            
+            .fc table {
+                table-layout: fixed;
+                width: 100% !important;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .fc .fc-button {
+                padding: 0.2em 0.4em;
+                font-size: 0.75em;
+            }
+            
+            .fc .fc-toolbar-title {
+                font-size: 1em;
+            }
+            
+            .fc .fc-col-header-cell-cushion {
+                font-size: 0.65em;
+            }
         }
     </style>
 </head>
@@ -323,13 +386,13 @@
             </div>
             
             <div class="weekday-header">
-                <div class="weekday">Sun</div>
                 <div class="weekday">Mon</div>
                 <div class="weekday">Tue</div>
                 <div class="weekday">Wed</div>
                 <div class="weekday">Thu</div>
                 <div class="weekday">Fri</div>
                 <div class="weekday">Sat</div>
+                <div class="weekday">Sun</div>
             </div>
             
             <div class="calendar-grid" id="calendar-grid">
@@ -482,8 +545,11 @@
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
+            // Adjust first day to be Monday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+            const adjustedFirstDay = (firstDay === 0) ? 6 : firstDay - 1;
+            
             // Add empty cells for days before first day of month
-            for (let i = 0; i < firstDay; i++) {
+            for (let i = 0; i < adjustedFirstDay; i++) {
                 const emptyCell = document.createElement('div');
                 emptyCell.className = 'calendar-day empty';
                 grid.appendChild(emptyCell);
@@ -603,6 +669,15 @@
             div.textContent = text;
             return div.innerHTML;
         }
+        
+        // In your FullCalendar initialization, add/update these options:
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            // ...existing options...
+            handleWindowResize: true,
+            contentHeight: 'auto',
+            dayHeaderFormat: { weekday: 'short' }, // Use short weekday names on all screens
+            // ...existing options...
+        });
     </script>
 </body>
 </html>
