@@ -1,0 +1,26 @@
+{% extends "account/base.html" %}
+
+{% block title %}Sign In - Podcast Date Finder{% endblock %}
+
+{% block content %}
+<div class="auth-header">
+    <h1>🎙️ Podcast Date Finder</h1>
+    <p class="subtitle">Sign in with {{ provider.name }}</p>
+</div>
+
+<form method="post" action="{% url 'socialaccount_login' %}?process={{ process }}" class="auth-form">
+    {% csrf_token %}
+    
+    <p style="text-align: center; color: #666; margin-bottom: 20px;">
+        You are about to sign in using your <strong>{{ provider.name }}</strong> account.
+    </p>
+    
+    <input type="hidden" name="provider" value="{{ provider.id }}">
+    
+    <button type="submit" class="btn btn-oauth">
+        🔐 Continue with {{ provider.name }}
+    </button>
+    
+    <a href="{% url 'account_login' %}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "account/base.html" %}
+
+{% block title %}Sign In - Podcast Date Finder{% endblock %}
+
+{% block content %}
+<div class="auth-header">
+    <h1>🎙️ Podcast Date Finder</h1>
+    <p class="subtitle">Sign in to coordinate your podcast recording dates</p>
+</div>
+
+{% if form.errors %}
+<div class="alert alert-error">
+    Please correct the errors below.
+</div>
+{% endif %}
+
+{% if messages %}
+{% for message in messages %}
+<div class="alert alert-{{ message.tags }}">
+    {{ message }}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Social Login Options -->
+{% load socialaccount %}
+{% get_providers as socialaccount_providers %}
+
+{% if socialaccount_providers %}
+<div class="social-login">
+    <ul class="socialaccount_providers">
+        {% for provider in socialaccount_providers %}
+        <li>
+            <a href="{% provider_login_url provider.id %}" title="{{ provider.name }}">
+                🔐 Sign in with {{ provider.name }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="divider">
+    <span>or sign in with credentials</span>
+</div>
+{% endif %}
+
+<form method="post" action="{% url 'account_login' %}" class="auth-form">
+    {% csrf_token %}
+    
+    <div class="form-group">
+        <label for="id_login">Username or Email</label>
+        <input type="text" name="login" id="id_login" placeholder="Enter your username or email" 
+               value="{{ form.login.value|default:'' }}" required autofocus>
+        {% if form.login.errors %}
+        <ul class="errorlist">
+            {% for error in form.login.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    
+    <div class="form-group">
+        <label for="id_password">Password</label>
+        <input type="password" name="password" id="id_password" placeholder="Enter your password" required>
+        {% if form.password.errors %}
+        <ul class="errorlist">
+            {% for error in form.password.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    
+    {% if redirect_field_value %}
+    <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+    {% endif %}
+    
+    <button type="submit" class="btn btn-primary">Sign In</button>
+</form>
+
+<div class="auth-links">
+    <p>Don't have an account? <a href="{% url 'account_signup' %}">Sign up</a></p>
+</div>
+{% endblock %}

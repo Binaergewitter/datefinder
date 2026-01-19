@@ -9,19 +9,28 @@ These tests verify the complete flow of:
 """
 
 import json
+import asyncio
 from datetime import date, timedelta
-from django.test import TestCase, Client, TransactionTestCase
+from django.test import TestCase, Client, TransactionTestCase, override_settings
 from django.contrib.auth.models import User
 from django.urls import reverse
 from channels.testing import WebsocketCommunicator
 from channels.routing import URLRouter
 from channels.auth import AuthMiddlewareStack
 from asgiref.sync import sync_to_async
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock, AsyncMock
 
 from .models import Availability
 from .consumers import CalendarConsumer
 from .routing import websocket_urlpatterns
+
+
+# Test settings to disable channel layer for most tests
+TEST_CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}
 
 
 class AvailabilityModelTest(TestCase):
@@ -130,6 +139,17 @@ class IntegrationTest(TransactionTestCase):
         # Future date for testing
         self.test_date = date.today() + timedelta(days=5)
         self.test_date_str = self.test_date.isoformat()
+        
+        # Create a mock for the channel layer
+        self.channel_layer_patcher = patch('calendar_app.views.get_channel_layer')
+        self.mock_get_channel_layer = self.channel_layer_patcher.start()
+        mock_channel_layer = MagicMock()
+        mock_channel_layer.group_send = AsyncMock(return_value=None)
+        self.mock_get_channel_layer.return_value = mock_channel_layer
+    
+    def tearDown(self):
+        """Clean up patches."""
+        self.channel_layer_patcher.stop()
     
     def test_full_availability_flow(self):
         """
@@ -149,13 +169,9 @@ class IntegrationTest(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         
         # Step 2: User 1 marks a date as available
-        with patch('calendar_app.views.get_channel_layer') as mock_channel_layer:
-            # Mock the channel layer to avoid async issues in tests
-            mock_channel_layer.return_value.group_send = lambda *args, **kwargs: None
-            
-            response = self.client.post(
-                reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
-            )
+        response = self.client.post(
+            reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
+        )
         
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -203,22 +219,18 @@ class IntegrationTest(TransactionTestCase):
         # User 1 logs in and marks available
         self.client.login(username='podcasthost', password='hostpass123')
         
-        with patch('calendar_app.views.get_channel_layer') as mock_channel_layer:
-            mock_channel_layer.return_value.group_send = lambda *args, **kwargs: None
-            self.client.post(
-                reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
-            )
+        self.client.post(
+            reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
+        )
         
         self.client.logout()
         
         # User 2 logs in and also marks available
         self.client.login(username='podcastguest', password='guestpass123')
         
-        with patch('calendar_app.views.get_channel_layer') as mock_channel_layer:
-            mock_channel_layer.return_value.group_send = lambda *args, **kwargs: None
-            response = self.client.post(
-                reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
-            )
+        response = self.client.post(
+            reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
+        )
         
         data = response.json()
         self.assertTrue(data['success'])
@@ -267,27 +279,24 @@ class IntegrationTest(TransactionTestCase):
         """
         self.client.login(username='podcasthost', password='hostpass123')
         
-        with patch('calendar_app.views.get_channel_layer') as mock_channel_layer:
-            mock_channel_layer.return_value.group_send = lambda *args, **kwargs: None
-            
-            # First click: available
-            response = self.client.post(
-                reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
-            )
-            self.assertEqual(response.json()['user_status'], 'available')
-            
-            # Second click: tentative
-            response = self.client.post(
-                reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
-            )
-            self.assertEqual(response.json()['user_status'], 'tentative')
-            
-            # Third click: removed
-            response = self.client.post(
-                reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
-            )
-            self.assertIsNone(response.json()['user_status'])
-            self.assertEqual(len(response.json()['availability']), 0)
+        # First click: available
+        response = self.client.post(
+            reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
+        )
+        self.assertEqual(response.json()['user_status'], 'available')
+        
+        # Second click: tentative
+        response = self.client.post(
+            reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
+        )
+        self.assertEqual(response.json()['user_status'], 'tentative')
+        
+        # Third click: removed
+        response = self.client.post(
+            reverse('calendar_app:toggle_availability', kwargs={'date': self.test_date_str})
+        )
+        self.assertIsNone(response.json()['user_status'])
+        self.assertEqual(len(response.json()['availability']), 0)
     
     def test_cannot_modify_past_dates(self):
         """

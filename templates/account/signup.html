@@ -1,0 +1,102 @@
+{% extends "account/base.html" %}
+
+{% block title %}Sign Up - Podcast Date Finder{% endblock %}
+
+{% block content %}
+<div class="auth-header">
+    <h1>🎙️ Podcast Date Finder</h1>
+    <p class="subtitle">Create an account to join your podcast team</p>
+</div>
+
+{% if form.errors %}
+<div class="alert alert-error">
+    Please correct the errors below.
+</div>
+{% endif %}
+
+<!-- Social Login Options -->
+{% load socialaccount %}
+{% get_providers as socialaccount_providers %}
+
+{% if socialaccount_providers %}
+<div class="social-login">
+    <ul class="socialaccount_providers">
+        {% for provider in socialaccount_providers %}
+        <li>
+            <a href="{% provider_login_url provider.id %}" title="{{ provider.name }}">
+                🔐 Sign up with {{ provider.name }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="divider">
+    <span>or create an account</span>
+</div>
+{% endif %}
+
+<form method="post" action="{% url 'account_signup' %}" class="auth-form">
+    {% csrf_token %}
+    
+    <div class="form-group">
+        <label for="id_username">Username</label>
+        <input type="text" name="username" id="id_username" placeholder="Choose a username" 
+               value="{{ form.username.value|default:'' }}" required autofocus>
+        {% if form.username.errors %}
+        <ul class="errorlist">
+            {% for error in form.username.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    
+    <div class="form-group">
+        <label for="id_email">Email</label>
+        <input type="email" name="email" id="id_email" placeholder="Enter your email" 
+               value="{{ form.email.value|default:'' }}">
+        {% if form.email.errors %}
+        <ul class="errorlist">
+            {% for error in form.email.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    
+    <div class="form-group">
+        <label for="id_password1">Password</label>
+        <input type="password" name="password1" id="id_password1" placeholder="Create a password" required>
+        {% if form.password1.errors %}
+        <ul class="errorlist">
+            {% for error in form.password1.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    
+    <div class="form-group">
+        <label for="id_password2">Confirm Password</label>
+        <input type="password" name="password2" id="id_password2" placeholder="Confirm your password" required>
+        {% if form.password2.errors %}
+        <ul class="errorlist">
+            {% for error in form.password2.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    
+    {% if redirect_field_value %}
+    <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+    {% endif %}
+    
+    <button type="submit" class="btn btn-primary">Sign Up</button>
+</form>
+
+<div class="auth-links">
+    <p>Already have an account? <a href="{% url 'account_login' %}">Sign in</a></p>
+</div>
+{% endblock %}
