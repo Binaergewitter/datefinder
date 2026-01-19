@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcast Date Finder</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        header h1 {
+            color: #333;
+            font-size: 1.5rem;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .user-info span {
+            color: #666;
+        }
+        
+        .logout-btn {
+            background: #764ba2;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        
+        .logout-btn:hover {
+            background: #5a3b7d;
+        }
+        
+        .calendar-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .calendar-header h2 {
+            color: #333;
+            font-size: 1.3rem;
+        }
+        
+        .nav-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+        
+        .nav-btn:hover {
+            background: #5a6fd6;
+        }
+        
+        .weekday-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .weekday {
+            text-align: center;
+            font-weight: 600;
+            color: #666;
+            padding: 10px;
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+        
+        .calendar-day {
+            min-height: 120px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            border: 2px solid transparent;
+        }
+        
+        .calendar-day:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .calendar-day.past {
+            background: #e9ecef;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
+        .calendar-day.past:hover {
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .calendar-day.empty {
+            background: transparent;
+            cursor: default;
+        }
+        
+        .calendar-day.empty:hover {
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .calendar-day.user-available {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+        
+        .calendar-day.user-tentative {
+            background: #fff3cd;
+            border-color: #ffc107;
+        }
+        
+        .day-number {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1rem;
+        }
+        
+        .star-indicator {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 1.2rem;
+            color: #ffc107;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        
+        .availability-list {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            max-height: 70px;
+            overflow-y: auto;
+        }
+        
+        .availability-item {
+            padding: 2px 4px;
+            border-radius: 4px;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .availability-item.available {
+            background: #155724;
+            color: white;
+        }
+        
+        .availability-item.tentative {
+            background: #ff8c00;
+            color: white;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        .legend-color.available {
+            background: #d4edda;
+            border: 2px solid #28a745;
+        }
+        
+        .legend-color.tentative {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+        }
+        
+        .legend-color.others-available {
+            background: #155724;
+        }
+        
+        .legend-color.others-tentative {
+            background: #ff8c00;
+        }
+        
+        .connection-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .connection-status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .connection-status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        
+        .status-dot.connected {
+            background: #28a745;
+        }
+        
+        .status-dot.disconnected {
+            background: #dc3545;
+        }
+        
+        @media (max-width: 768px) {
+            .calendar-day {
+                min-height: 80px;
+                padding: 4px;
+            }
+            
+            .day-number {
+                font-size: 0.9rem;
+            }
+            
+            .availability-list {
+                font-size: 0.65rem;
+            }
+            
+            header {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ Podcast Date Finder</h1>
+            <div class="user-info">
+                <span>Welcome, <strong>{{ user.get_full_name|default:user.username }}</strong></span>
+                <a href="{% url 'account_logout' %}" class="logout-btn">Logout</a>
+            </div>
+        </header>
+        
+        <div class="calendar-container">
+            <div class="calendar-header">
+                <button class="nav-btn" id="prev-month">← Previous</button>
+                <h2 id="current-month"></h2>
+                <button class="nav-btn" id="next-month">Next →</button>
+            </div>
+            
+            <div class="weekday-header">
+                <div class="weekday">Sun</div>
+                <div class="weekday">Mon</div>
+                <div class="weekday">Tue</div>
+                <div class="weekday">Wed</div>
+                <div class="weekday">Thu</div>
+                <div class="weekday">Fri</div>
+                <div class="weekday">Sat</div>
+            </div>
+            
+            <div class="calendar-grid" id="calendar-grid">
+                <!-- Calendar days will be populated by JavaScript -->
+            </div>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color available"></div>
+                    <span>You're Available</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color tentative"></div>
+                    <span>You're Tentatively Available</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color others-available"></div>
+                    <span>Others Available</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color others-tentative"></div>
+                    <span>Others Tentative</span>
+                </div>
+                <div class="legend-item">
+                    <span>⭐ = 3+ people available</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="connection-status disconnected" id="connection-status">
+        <div class="status-dot disconnected"></div>
+        <span>Connecting...</span>
+    </div>
+    
+    <script>
+        // Store availability data
+        let availabilityData = {};
+        let currentUserId = null;
+        let currentDate = new Date();
+        let socket = null;
+        
+        // CSRF token for POST requests
+        const csrfToken = '{{ csrf_token }}';
+        
+        // Initialize the calendar
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAvailabilityData();
+            connectWebSocket();
+            
+            document.getElementById('prev-month').addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() - 1);
+                renderCalendar();
+            });
+            
+            document.getElementById('next-month').addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() + 1);
+                renderCalendar();
+            });
+        });
+        
+        // Load initial availability data
+        async function loadAvailabilityData() {
+            try {
+                const response = await fetch('/calendar/api/availability/');
+                const data = await response.json();
+                if (data.success) {
+                    availabilityData = data.data;
+                    currentUserId = data.current_user_id;
+                    renderCalendar();
+                }
+            } catch (error) {
+                console.error('Error loading availability:', error);
+            }
+        }
+        
+        // Connect to WebSocket for real-time updates
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            socket = new WebSocket(`${protocol}//${window.location.host}/ws/calendar/`);
+            
+            socket.onopen = function() {
+                updateConnectionStatus(true);
+            };
+            
+            socket.onclose = function() {
+                updateConnectionStatus(false);
+                // Attempt to reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            socket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                updateConnectionStatus(false);
+            };
+            
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === 'availability_update') {
+                    // Update local data
+                    if (data.availability.length > 0) {
+                        availabilityData[data.date] = {
+                            availability: data.availability,
+                            has_star: data.has_star
+                        };
+                    } else {
+                        delete availabilityData[data.date];
+                    }
+                    // Re-render the affected day
+                    updateDayCell(data.date);
+                }
+            };
+        }
+        
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('connection-status');
+            const dotEl = statusEl.querySelector('.status-dot');
+            const textEl = statusEl.querySelector('span');
+            
+            if (connected) {
+                statusEl.className = 'connection-status connected';
+                dotEl.className = 'status-dot connected';
+                textEl.textContent = 'Live';
+            } else {
+                statusEl.className = 'connection-status disconnected';
+                dotEl.className = 'status-dot disconnected';
+                textEl.textContent = 'Reconnecting...';
+            }
+        }
+        
+        // Render the calendar
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const monthLabel = document.getElementById('current-month');
+            
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            // Update month label
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+            monthLabel.textContent = `${monthNames[month]} ${year}`;
+            
+            // Clear grid
+            grid.innerHTML = '';
+            
+            // Get first day of month and total days
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // Add empty cells for days before first day of month
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'calendar-day empty';
+                grid.appendChild(emptyCell);
+            }
+            
+            // Add cells for each day
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(year, month, day);
+                const dateStr = formatDate(date);
+                
+                const dayCell = document.createElement('div');
+                dayCell.className = 'calendar-day';
+                dayCell.dataset.date = dateStr;
+                
+                // Check if past date
+                if (date < today) {
+                    dayCell.classList.add('past');
+                } else {
+                    dayCell.addEventListener('click', () => toggleAvailability(dateStr));
+                }
+                
+                // Add day content
+                updateDayCellContent(dayCell, dateStr, day);
+                
+                grid.appendChild(dayCell);
+            }
+        }
+        
+        function updateDayCell(dateStr) {
+            const dayCell = document.querySelector(`[data-date="${dateStr}"]`);
+            if (dayCell && !dayCell.classList.contains('past')) {
+                const day = parseInt(dateStr.split('-')[2]);
+                updateDayCellContent(dayCell, dateStr, day);
+            }
+        }
+        
+        function updateDayCellContent(dayCell, dateStr, day) {
+            const data = availabilityData[dateStr];
+            const availability = data ? data.availability : [];
+            const hasStar = data ? data.has_star : false;
+            
+            // Find current user's status
+            const userEntry = availability.find(a => a.user_id === currentUserId);
+            const userStatus = userEntry ? userEntry.status : null;
+            
+            // Update cell classes
+            dayCell.classList.remove('user-available', 'user-tentative');
+            if (userStatus === 'available') {
+                dayCell.classList.add('user-available');
+            } else if (userStatus === 'tentative') {
+                dayCell.classList.add('user-tentative');
+            }
+            
+            // Build cell content
+            let html = `<div class="day-number">${day}</div>`;
+            
+            if (hasStar) {
+                html += '<div class="star-indicator">⭐</div>';
+            }
+            
+            // Show other users' availability
+            const otherUsers = availability.filter(a => a.user_id !== currentUserId);
+            if (otherUsers.length > 0) {
+                html += '<div class="availability-list">';
+                for (const user of otherUsers) {
+                    const statusClass = user.status === 'available' ? 'available' : 'tentative';
+                    html += `<div class="availability-item ${statusClass}">${escapeHtml(user.username)}</div>`;
+                }
+                html += '</div>';
+            }
+            
+            dayCell.innerHTML = html;
+        }
+        
+        // Toggle availability for a date
+        async function toggleAvailability(dateStr) {
+            try {
+                const response = await fetch(`/calendar/api/toggle/${dateStr}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update local data
+                    if (data.availability.length > 0) {
+                        availabilityData[dateStr] = {
+                            availability: data.availability,
+                            has_star: data.has_star
+                        };
+                    } else {
+                        delete availabilityData[dateStr];
+                    }
+                    
+                    // Update the cell
+                    updateDayCell(dateStr);
+                }
+            } catch (error) {
+                console.error('Error toggling availability:', error);
+            }
+        }
+        
+        // Helper functions
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
