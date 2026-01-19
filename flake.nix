@@ -32,6 +32,9 @@
         # channels-redis is not in nixpkgs, we'll make it optional
         # For production, users can install it via pip in the environment
         
+        # Python with all dependencies
+        pythonWithDeps = python.withPackages (ps: pythonDeps);
+        
         datefinder = pythonPackages.buildPythonApplication {
           pname = "datefinder";
           version = "0.1.0";
@@ -70,24 +73,30 @@ export DJANGO_SETTINGS_MODULE="datefinder.settings"
 # Default to current directory for writable data if not set
 export DATEFINDER_DATA_DIR="\''${DATEFINDER_DATA_DIR:-\$PWD}"
 
-# Create a wrapper settings module that uses writable paths
+# Set database path to writable location (defaults to current directory)
+export DATABASE_PATH="\''${DATABASE_PATH:-\$DATEFINDER_DATA_DIR/db.sqlite3}"
+
+# Create data directory if it doesn't exist
+mkdir -p "\$DATEFINDER_DATA_DIR"
+
 cd "$out/lib/datefinder"
 
 # Run migrations and collect static files if needed
+echo "Using database: ''${DATABASE_PATH:-unset}"
 if [ "\$1" = "migrate" ]; then
-    exec ${python}/bin/python manage.py migrate --database default
+    exec ${pythonWithDeps}/bin/python manage.py migrate --database default
 elif [ "\$1" = "collectstatic" ]; then
-    exec ${python}/bin/python manage.py collectstatic --noinput
+    exec ${pythonWithDeps}/bin/python manage.py collectstatic --noinput
 elif [ "\$1" = "createsuperuser" ]; then
-    exec ${python}/bin/python manage.py createsuperuser
+    exec ${pythonWithDeps}/bin/python manage.py createsuperuser
 elif [ "\$1" = "shell" ]; then
-    exec ${python}/bin/python manage.py shell
+    exec ${pythonWithDeps}/bin/python manage.py shell
 elif [ "\$1" = "manage" ]; then
     shift
-    exec ${python}/bin/python manage.py "\$@"
+    exec ${pythonWithDeps}/bin/python manage.py "\$@"
 else
     # Default: run the development server with daphne
-    exec ${pythonPackages.daphne}/bin/daphne -b "\''${HOST:-0.0.0.0}" -p "\''${PORT:-8000}" datefinder.asgi:application
+    exec ${pythonWithDeps}/bin/daphne -b "\''${HOST:-0.0.0.0}" -p "\''${PORT:-8000}" datefinder.asgi:application
 fi
 EOF
             chmod +x $out/bin/datefinder-server
