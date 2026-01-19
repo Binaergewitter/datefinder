@@ -11,19 +11,21 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         
-        python = pkgs.python311;
+        python = pkgs.python3;
         
         pythonPackages = python.pkgs;
         
         # Python dependencies
         pythonDeps = with pythonPackages; [
-          django_4
+          django
           django-allauth
           channels
           daphne
           whitenoise
           python-dotenv
           asgiref
+          requests
+          jwt
         ];
         
         # channels-redis is not in nixpkgs, we'll make it optional
@@ -104,6 +106,40 @@ EOF
         packages = {
           default = datefinder;
           datefinder = datefinder;
+          
+          # Test package - run with: nix build .#test
+          test = pkgs.runCommand "datefinder-tests" {
+            buildInputs = [ (python.withPackages (ps: pythonDeps)) ];
+            src = ./.;
+          } ''
+            export HOME=$TMPDIR
+            
+            # Copy source to writable directory
+            cp -r $src source
+            chmod -R u+w source
+            cd source
+            
+            # Create staticfiles directory to avoid warnings
+            mkdir -p staticfiles
+            
+            # Debug: show directory structure
+            echo "=== Directory structure ==="
+            ls -la
+            ls -la calendar_app/
+            
+            # Run migrations using in-memory SQLite
+            python manage.py migrate --settings=datefinder.settings
+            
+            # Run integration tests
+            echo "=== Running Integration Tests ==="
+            python manage.py test calendar_app.tests.IntegrationTest --settings=datefinder.settings -v 2
+            
+            # Run all tests
+            echo "=== Running All Tests ==="
+            python manage.py test calendar_app --settings=datefinder.settings -v 2
+            
+            echo "All tests passed!" > $out
+          '';
         };
         
         apps = {
@@ -118,6 +154,9 @@ EOF
             python
             pythonPackages.pip
             pythonPackages.virtualenv
+            pythonPackages.pytest
+            pythonPackages.pytest-django
+            pythonPackages.pytest-asyncio
           ] ++ pythonDeps ++ [
             pkgs.redis
           ];
@@ -132,8 +171,28 @@ EOF
             echo "Or with daphne (for WebSocket support):"
             echo "  daphne -b 0.0.0.0 -p 8000 datefinder.asgi:application"
             echo ""
+            echo "To run tests:"
+            echo "  python manage.py test calendar_app"
+            echo ""
           '';
         };
+        
+        # Add a check for running tests
+        checks.default = pkgs.runCommand "datefinder-tests" {
+          buildInputs = [ python ] ++ pythonDeps;
+        } ''
+          export HOME=$TMPDIR
+          cp -r ${./.}/* .
+          chmod -R u+w .
+          
+          # Run migrations
+          python manage.py migrate --settings=datefinder.settings
+          
+          # Run tests
+          python manage.py test calendar_app --settings=datefinder.settings -v 2
+          
+          touch $out
+        '';
       }
     );
 }
