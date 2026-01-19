@@ -114,6 +114,50 @@ python manage.py collectstatic
 daphne -b 127.0.0.1 -p 8000 datefinder.asgi:application
 ```
 
+### Reverse Proxy Configuration
+
+When running behind a reverse proxy (e.g., nginx) with HTTPS, configure these environment variables:
+
+```bash
+# The external URL where the app is accessible
+SITE_URL=https://plan.binaergewitter.de
+
+# Add the domain to allowed hosts
+ALLOWED_HOSTS=plan.binaergewitter.de,localhost,127.0.0.1
+
+# Trust proxy headers for proper HTTPS detection
+USE_X_FORWARDED_HOST=true
+TRUST_PROXY_HEADERS=true
+
+# Additional CSRF trusted origins (SITE_URL is added automatically)
+# CSRF_TRUSTED_ORIGINS=https://other-domain.com
+```
+
+Example nginx configuration:
+```nginx
+server {
+    listen 443 ssl;
+    server_name plan.binaergewitter.de;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+
+        # WebSocket support
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
 ## Usage
 
 1. Navigate to `http://localhost:8000`

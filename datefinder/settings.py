@@ -21,6 +21,24 @@ DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# Reverse proxy configuration
+# Set SITE_URL to the external URL when running behind a reverse proxy
+# e.g., SITE_URL=https://plan.binaergewitter.de
+SITE_URL = os.getenv('SITE_URL', '')
+
+# Trust the X-Forwarded-Host header from the reverse proxy
+USE_X_FORWARDED_HOST = os.getenv('USE_X_FORWARDED_HOST', 'False').lower() == 'true'
+
+# Trust the X-Forwarded-Proto header to detect HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') if os.getenv('TRUST_PROXY_HEADERS', 'False').lower() == 'true' else None
+
+# CSRF trusted origins - required for HTTPS behind a reverse proxy
+# Automatically add SITE_URL if configured
+_csrf_origins = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in _csrf_origins.split(',') if origin.strip()]
+if SITE_URL and SITE_URL not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(SITE_URL)
+
 # Application definition
 INSTALLED_APPS = [
     'daphne',
