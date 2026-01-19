@@ -25,7 +25,8 @@
           python-dotenv
           asgiref
           requests
-          jwt
+          pyjwt  # PyJWT library for JWT handling (required by django-allauth)
+          cryptography  # Required for RS256 JWT verification
         ];
         
         # channels-redis is not in nixpkgs, we'll make it optional
