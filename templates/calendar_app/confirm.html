@@ -367,7 +367,7 @@
             {% endif %}
             
             <div class="export-link">
-                <a href="{% url 'calendar_app:export_csv' %}" target="_blank">📥 Download Calendar CSV</a>
+                <a href="{% url 'calendar_app:export_ical' %}" target="_blank">📥 Download Calendar (iCal)</a>
             </div>
         </div>
     </div>
@@ -388,11 +388,35 @@
     <script>
         const csrfToken = '{{ csrf_token }}';
         let selectedDate = null;
+        let nextPodcastNumber = null;
+        
+        // Fetch the next podcast number on page load
+        async function fetchNextPodcastNumber() {
+            try {
+                const response = await fetch('/calendar/api/next-podcast-number/');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.next_number) {
+                        nextPodcastNumber = data.next_number;
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching podcast number:', error);
+            }
+        }
+        
+        // Fetch on page load
+        fetchNextPodcastNumber();
         
         function openConfirmModal(date, dateDisplay) {
             selectedDate = date;
             document.getElementById('modal-date-display').textContent = dateDisplay;
-            document.getElementById('description').value = '';
+            // Pre-fill with next podcast number if available
+            if (nextPodcastNumber) {
+                document.getElementById('description').value = `Folge ${nextPodcastNumber}`;
+            } else {
+                document.getElementById('description').value = '';
+            }
             document.getElementById('confirm-modal').classList.add('active');
         }
         

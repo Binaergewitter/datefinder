@@ -11,5 +11,6 @@ urlpatterns = [
     path('api/confirm/<str:date>/', views.confirm_date, name='confirm_date'),
     path('api/unconfirm/<str:date>/', views.unconfirm_date, name='unconfirm_date'),
     path('api/confirmed/', views.get_confirmed_dates, name='get_confirmed_dates'),
-    path('export/calendar.csv', views.export_csv, name='export_csv'),
+    path('api/next-podcast-number/', views.get_next_podcast_number, name='get_next_podcast_number'),
+    path('export/calendar.ics', views.export_ical, name='export_ical'),
 ]
