@@ -55,6 +55,7 @@ A Django web application that helps a group of friends find a common meeting dat
    KEYCLOAK_CLIENT_ID=your-client-id
    KEYCLOAK_CLIENT_SECRET=your-client-secret
    SECRET_KEY=your-django-secret-key
+   DEBUG=false
    ```
 
 5. Run migrations:
@@ -142,6 +143,34 @@ REGISTRATION_ENABLED=true
 # Show local username/password login form (enabled by default)
 # Set to false to only allow social login (Keycloak)
 LOCAL_LOGIN_ENABLED=true
+```
+
+### Database and State Configuration
+
+```bash
+# Directory for storing state files (database, iCal export)
+# Default: /tmp
+STATEDIR=/var/lib/datefinder
+
+# Path to SQLite database file
+# Default: <STATEDIR>/db.sqlite3
+DATABASE_PATH=/var/lib/datefinder/db.sqlite3
+
+# Path where the iCal export file will be written
+# Default: <STATEDIR>/calendar.ics
+ICAL_EXPORT_PATH=/var/lib/datefinder/calendar.ics
+```
+
+### Additional Configuration
+
+```bash
+# Enable Django debug mode (for development only!)
+# Default: false
+DEBUG=false
+
+# Django secret key (required for production)
+# Generate with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
+SECRET_KEY=your-random-secret-key
 ```
 
 ### Notification Configuration (Apprise)

@@ -11,7 +11,7 @@ load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-STATEDIR = os.getenv("STATEDIR", Path.cwd())
+STATEDIR = Path(os.getenv("STATEDIR", "/tmp")).resolve() # there is no reliable way to use Path.cwd()
 
 
 # SECURITY WARNING: keep the secret key used in production secret!
