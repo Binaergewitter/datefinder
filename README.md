@@ -17,6 +17,7 @@ A Django web application that helps a group of friends find a common meeting dat
   - Dark green labels for available users
   - Orange labels for tentatively available users
 - **Star Indicator**: Dates with 3+ people available are marked with a ⭐
+- **Configurable Registration**: User registration can be enabled/disabled via environment variable (disabled by default)
 
 ## Setup
 
@@ -131,6 +132,13 @@ TRUST_PROXY_HEADERS=true
 
 # Additional CSRF trusted origins (SITE_URL is added automatically)
 # CSRF_TRUSTED_ORIGINS=https://other-domain.com
+
+# Enable user registration (disabled by default)
+REGISTRATION_ENABLED=true
+
+# Show local username/password login form (enabled by default)
+# Set to false to only allow social login (Keycloak)
+LOCAL_LOGIN_ENABLED=true
 ```
 
 Example nginx configuration:
