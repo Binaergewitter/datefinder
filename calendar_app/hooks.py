@@ -93,31 +93,47 @@ class AppriseHook(PostActionHook):
             logger.debug("No Apprise URLs configured, skipping notification")
             return
         
+        logger.debug(f"Preparing to send Apprise notification. URLs configured: {len(self.urls)}")
+        logger.debug(f"Notification title: {title}")
+        logger.debug(f"Notification message: {message}")
+        
         try:
             import apprise
             
-            apobj = apprise.Apprise()
-            for url in self.urls:
-                apobj.add(url)
+            logger.debug(f"Apprise version: {apprise.__version__}")
             
+            apobj = apprise.Apprise()
+            for idx, url in enumerate(self.urls):
+                # Mask sensitive parts of URL for logging
+                masked_url = url.split('://')[0] + '://***' if '://' in url else '***'
+                logger.debug(f"Adding Apprise URL {idx + 1}/{len(self.urls)}: {masked_url}")
+                add_result = apobj.add(url)
+                logger.debug(f"URL {idx + 1} add result: {add_result}")
+            
+            logger.debug(f"Total services loaded: {len(apobj)}")
+            
+            logger.info(f"Sending notification via Apprise to {len(apobj)} service(s)")
             success = apobj.notify(
                 body=message,
                 title=title,
             )
             
             if success:
-                logger.info(f"Apprise notification sent successfully")
+                logger.info(f"Apprise notification sent successfully to all services")
             else:
-                logger.warning(f"Apprise notification may have failed")
+                logger.warning(f"Apprise notification failed or partially failed")
                 
         except ImportError:
             logger.warning("Apprise library not installed. Run: pip install apprise")
         except Exception as e:
-            logger.error(f"Error sending Apprise notification: {e}")
+            logger.error(f"Error sending Apprise notification: {e}", exc_info=True)
     
     def on_confirm(self, date: date_type, description: str, confirmed_by: Optional[User] = None) -> None:
         if not self.urls:
+            logger.debug("Skipping Apprise notification for confirm (no URLs configured)")
             return
+        
+        logger.debug(f"Preparing confirm notification for date: {date}")
             
         context = {
             'date': date.isoformat(),
@@ -127,19 +143,30 @@ class AppriseHook(PostActionHook):
             'site_url': getattr(settings, 'SITE_URL', ''),
         }
         
+        logger.debug(f"Notification context: {context}")
+        
         message = self._render_template(self.confirm_template, context)
+        logger.debug(f"Rendered message from template: {message}")
+        
         self._send_notification(message, title="📅 Podcast Date Confirmed")
     
     def on_unconfirm(self, date: date_type) -> None:
         if not self.urls:
+            logger.debug("Skipping Apprise notification for unconfirm (no URLs configured)")
             return
+        
+        logger.debug(f"Preparing unconfirm notification for date: {date}")
             
         context = {
             'date': date.isoformat(),
             'date_formatted': date.strftime('%A, %B %d, %Y'),
         }
         
+        logger.debug(f"Notification context: {context}")
+        
         message = self._render_template(self.unconfirm_template, context)
+        logger.debug(f"Rendered message from template: {message}")
+        
         self._send_notification(message, title="❌ Podcast Date Unconfirmed")
 
 
