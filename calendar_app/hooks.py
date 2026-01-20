@@ -194,11 +194,35 @@ class LoggingHook(PostActionHook):
         logger.info(f"Date unconfirmed: {date}")
 
 
+class ICalExportHook(PostActionHook):
+    """
+    Hook that regenerates the iCal file when dates are confirmed/unconfirmed.
+    The file is written to the path configured in ICAL_EXPORT_PATH.
+    """
+    
+    def on_confirm(self, date: date_type, description: str, confirmed_by: Optional[User] = None) -> None:
+        from .ical import generate_ical_file
+        try:
+            path = generate_ical_file()
+            logger.info(f"iCal file regenerated after confirming {date}: {path}")
+        except Exception as e:
+            logger.error(f"Failed to regenerate iCal file after confirming {date}: {e}")
+    
+    def on_unconfirm(self, date: date_type) -> None:
+        from .ical import generate_ical_file
+        try:
+            path = generate_ical_file()
+            logger.info(f"iCal file regenerated after unconfirming {date}: {path}")
+        except Exception as e:
+            logger.error(f"Failed to regenerate iCal file after unconfirming {date}: {e}")
+
+
 # Registry of active hooks
 # Add or remove hooks here to enable/disable them
 HOOK_REGISTRY: list[PostActionHook] = [
     LoggingHook(),
     AppriseHook(),
+    ICalExportHook(),
 ]
 
 

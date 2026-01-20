@@ -218,6 +218,10 @@ APPRISE_UNCONFIRM_TEMPLATE = os.getenv(
     '⛈️ BGT {{ date_formatted }} wurde abgesagt'
 )
 
+# iCal export settings
+# Path where the iCal file will be written (default: <cwd>/calendar.ics)
+ICAL_EXPORT_PATH = os.getenv('ICAL_EXPORT_PATH', str(CWD / 'calendar.ics'))
+
 # Logging configuration
 LOGGING = {
     'version': 1,

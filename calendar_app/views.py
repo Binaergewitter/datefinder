@@ -4,6 +4,7 @@ import urllib.request
 import urllib.error
 from datetime import date as date_type, datetime, timedelta
 import uuid
+from django.conf import settings
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
@@ -337,67 +338,31 @@ def get_next_podcast_number(request):
 @require_GET
 def export_ical(request):
     """
-    Export confirmed dates as a public iCal calendar.
+    Serve the iCal calendar file.
     No authentication required - nginx will handle caching.
-    Events are scheduled from 20:00 to 23:00.
+    The file is pre-generated and written to disk on startup and when dates change.
     """
-    from django.conf import settings
+    from pathlib import Path
     
-    confirmed = ConfirmedDate.objects.all().order_by('date').select_related('confirmed_by')
+    export_path = Path(getattr(settings, 'ICAL_EXPORT_PATH', 'calendar.ics'))
     
-    # Build iCal content
-    lines = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//Podcast Date Finder//EN',
-        'CALSCALE:GREGORIAN',
-        'METHOD:PUBLISH',
-        'X-WR-CALNAME:Podcast Recording Schedule',
-    ]
+    if not export_path.exists():
+        # Generate the file if it doesn't exist
+        from .ical import generate_ical_file
+        try:
+            generate_ical_file()
+        except Exception as e:
+            logger.error(f"Failed to generate iCal file: {e}")
+            return HttpResponse("Calendar not available", status=503)
     
-    for entry in confirmed:
-        # Create datetime for 20:00-23:00 on the confirmed date
-        start_dt = datetime.combine(entry.date, datetime.strptime('20:00', '%H:%M').time())
-        end_dt = datetime.combine(entry.date, datetime.strptime('23:00', '%H:%M').time())
-        
-        # Generate a stable UID based on the date
-        uid = f"{entry.date.isoformat()}-podcast@datefinder"
-        
-        # Format timestamps for iCal (local time)
-        dtstart = start_dt.strftime('%Y%m%dT%H%M%S')
-        dtend = end_dt.strftime('%Y%m%dT%H%M%S')
-        dtstamp = entry.created_at.strftime('%Y%m%dT%H%M%SZ')
-        
-        # Get organizer info
-        organizer = ''
-        if entry.confirmed_by:
-            organizer = entry.confirmed_by.get_full_name() or entry.confirmed_by.username
-        
-        # Build event
-        summary = entry.description if entry.description else 'Podcast Recording'
-        description = f"Confirmed by: {organizer}" if organizer else ''
-        
-        lines.extend([
-            'BEGIN:VEVENT',
-            f'UID:{uid}',
-            f'DTSTAMP:{dtstamp}',
-            f'DTSTART:{dtstart}',
-            f'DTEND:{dtend}',
-            f'SUMMARY:{_ical_escape(summary)}',
-        ])
-        
-        if description:
-            lines.append(f'DESCRIPTION:{_ical_escape(description)}')
-        
-        lines.append('END:VEVENT')
-    
-    lines.append('END:VCALENDAR')
-    
-    ical_content = '\r\n'.join(lines)
-    
-    response = HttpResponse(ical_content, content_type='text/calendar; charset=utf-8')
-    response['Content-Disposition'] = 'attachment; filename="podcast_calendar.ics"'
-    return response
+    try:
+        ical_content = export_path.read_text(encoding='utf-8')
+        response = HttpResponse(ical_content, content_type='text/calendar; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="podcast_calendar.ics"'
+        return response
+    except Exception as e:
+        logger.error(f"Failed to read iCal file from {export_path}: {e}")
+        return HttpResponse("Calendar not available", status=503)
 
 
 def _ical_escape(text: str) -> str:
