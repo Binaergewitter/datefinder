@@ -207,16 +207,6 @@ SOCIALACCOUNT_LOGIN_ON_GET = True
 # See https://github.com/caronc/apprise for supported services
 APPRISE_URLS = [url.strip() for url in os.getenv('APPRISE_URLS', '').split(',') if url.strip()]
 
-# Debug: Log apprise configuration at startup if DEBUG is enabled
-if DEBUG and APPRISE_URLS:
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"APPRISE_URLS configured with {len(APPRISE_URLS)} URL(s)")
-    for idx, url in enumerate(APPRISE_URLS):
-        # Mask sensitive parts
-        masked = url.split('://')[0] + '://***' if '://' in url else '***'
-        logger.info(f"  URL {idx + 1}: {masked}")
-
 # Jinja2 templates for notification messages
 # Available variables: date, date_formatted, description, confirmed_by, site_url
 APPRISE_CONFIRM_TEMPLATE = os.getenv(
@@ -234,7 +224,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
+            'format': '{asctime} {levelname} {module} {message}',
             'style': '{',
         },
         'simple': {
@@ -265,3 +255,13 @@ LOGGING = {
         },
     },
 }
+
+# Debug: Log apprise configuration at startup if DEBUG is enabled
+if DEBUG and APPRISE_URLS:
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"APPRISE_URLS configured with {len(APPRISE_URLS)} URL(s)")
+    for idx, url in enumerate(APPRISE_URLS):
+        # Mask sensitive parts
+        masked = url.split('://')[0] + '://***' if '://' in url else '***'
+        logger.info(f"  URL {idx + 1}: {masked}")
