@@ -21,8 +21,10 @@
           django-allauth
           channels
           daphne
+          apprise
           whitenoise
           python-dotenv
+          jinja2
           asgiref
           requests
           pyjwt  # PyJWT library for JWT handling (required by django-allauth)

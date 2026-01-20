@@ -201,6 +201,8 @@ def confirm_date(request, date):
         }
     )
     
+    logger.debug(f"Date {'created' if created else 'updated'} in database: {target_date}")
+    
     # Broadcast update to all connected clients via WebSocket
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
@@ -214,8 +216,12 @@ def confirm_date(request, date):
         }
     )
     
+    logger.debug(f"WebSocket broadcast sent for date: {date_str}")
+    
     # Run post-action hooks
+    logger.info(f"Running confirm hooks for date {target_date} with description: {description}")
     run_confirm_hooks(target_date, description, request.user)
+    logger.debug(f"Confirm hooks completed for date: {target_date}")
     
     return JsonResponse({
         'success': True,

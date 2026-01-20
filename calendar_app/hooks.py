@@ -22,6 +22,13 @@ from django.contrib.auth.models import User
 
 logger = logging.getLogger(__name__)
 
+# Check if apprise is available
+try:
+    import apprise
+    logger.info(f"Apprise library found, version: {apprise.__version__}")
+except ImportError:
+    logger.warning("Apprise library NOT installed. Install with: pip install apprise")
+
 
 class PostActionHook(ABC):
     """
@@ -76,6 +83,9 @@ class AppriseHook(PostActionHook):
             'APPRISE_UNCONFIRM_TEMPLATE', 
             'Date {{ date }} has been unconfirmed.'
         )
+        logger.debug(f"AppriseHook initialized with {len(self.urls)} URL(s)")
+        logger.debug(f"Confirm template: {self.confirm_template}")
+        logger.debug(f"Unconfirm template: {self.unconfirm_template}")
     
     def _render_template(self, template: str, context: dict) -> str:
         """Render a Jinja2 template with the given context."""
@@ -87,7 +97,7 @@ class AppriseHook(PostActionHook):
             logger.error(f"Error rendering template: {e}")
             return str(context.get('description', ''))
     
-    def _send_notification(self, message: str, title: str = "Podcast Date Finder") -> None:
+    def _send_notification(self, message: str, title: str = "") -> None:
         """Send notification to all configured Apprise URLs."""
         if not self.urls:
             logger.debug("No Apprise URLs configured, skipping notification")
@@ -148,7 +158,7 @@ class AppriseHook(PostActionHook):
         message = self._render_template(self.confirm_template, context)
         logger.debug(f"Rendered message from template: {message}")
         
-        self._send_notification(message, title="📅 Podcast Date Confirmed")
+        self._send_notification(message)
     
     def on_unconfirm(self, date: date_type) -> None:
         if not self.urls:
@@ -167,7 +177,7 @@ class AppriseHook(PostActionHook):
         message = self._render_template(self.unconfirm_template, context)
         logger.debug(f"Rendered message from template: {message}")
         
-        self._send_notification(message, title="❌ Podcast Date Unconfirmed")
+        self._send_notification(message)
 
 
 class LoggingHook(PostActionHook):
@@ -201,11 +211,15 @@ def run_confirm_hooks(date: date_type, description: str, confirmed_by: Optional[
         description: Description for the confirmed date
         confirmed_by: User who confirmed the date
     """
+    logger.debug(f"run_confirm_hooks called for date {date}, description: {description}")
+   
     for hook in HOOK_REGISTRY:
         try:
+            logger.debug(f"Running hook: {hook.__class__.__name__}")
             hook.on_confirm(date, description, confirmed_by)
+            logger.debug(f"Hook {hook.__class__.__name__} completed successfully")
         except Exception as e:
-            logger.error(f"Error running confirm hook {hook.__class__.__name__}: {e}")
+            logger.error(f"Error running confirm hook {hook.__class__.__name__}: {e}", exc_info=True)
 
 
 def run_unconfirm_hooks(date: date_type) -> None:
@@ -215,8 +229,12 @@ def run_unconfirm_hooks(date: date_type) -> None:
     Args:
         date: The unconfirmed date
     """
+    logger.debug(f"run_unconfirm_hooks called for date {date}")
+   
     for hook in HOOK_REGISTRY:
         try:
+            logger.debug(f"Running hook: {hook.__class__.__name__}")
             hook.on_unconfirm(date)
+            logger.debug(f"Hook {hook.__class__.__name__} completed successfully")
         except Exception as e:
-            logger.error(f"Error running unconfirm hook {hook.__class__.__name__}: {e}")
+            logger.error(f"Error running unconfirm hook {hook.__class__.__name__}: {e}", exc_info=True)
