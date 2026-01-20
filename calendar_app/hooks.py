@@ -19,6 +19,7 @@ from datetime import date as date_type
 from typing import Optional
 from django.conf import settings
 from django.contrib.auth.models import User
+from .ical import generate_ical_file
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +202,6 @@ class ICalExportHook(PostActionHook):
     """
     
     def on_confirm(self, date: date_type, description: str, confirmed_by: Optional[User] = None) -> None:
-        from .ical import generate_ical_file
         try:
             path = generate_ical_file()
             logger.info(f"iCal file regenerated after confirming {date}: {path}")
@@ -209,7 +209,6 @@ class ICalExportHook(PostActionHook):
             logger.error(f"Failed to regenerate iCal file after confirming {date}: {e}")
     
     def on_unconfirm(self, date: date_type) -> None:
-        from .ical import generate_ical_file
         try:
             path = generate_ical_file()
             logger.info(f"iCal file regenerated after unconfirming {date}: {path}")

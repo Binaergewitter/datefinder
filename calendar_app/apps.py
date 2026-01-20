@@ -7,14 +7,15 @@ class CalendarAppConfig(AppConfig):
     verbose_name = 'Calendar App'
 
     def ready(self):
-        """Called when the app is ready. Generate iCal file on startup."""
-        # Import here to avoid circular imports
-        from .ical import generate_ical_file
-        import logging
-        
-        logger = logging.getLogger(__name__)
+        """
+        Called when the app is ready.
+        Generates the initial iCal file.
+        """
+        from . import ical
         try:
-            generate_ical_file()
-            logger.info("iCal file generated on startup")
+            ical.generate_ical_file()
         except Exception as e:
-            logger.error(f"Failed to generate iCal file on startup: {e}")
+            # Log the error, but don't prevent startup
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to generate initial iCal file on startup: {e}", exc_info=True)

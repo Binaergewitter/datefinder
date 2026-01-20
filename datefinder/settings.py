@@ -11,7 +11,8 @@ load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-CWD = Path.cwd()
+STATEDIR = os.getenv("STATEDIR", Path.cwd())
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production')
@@ -114,7 +115,7 @@ else:
     }
 
 # Database - use DATABASE_PATH env var for Nix deployments, otherwise use local db.sqlite3
-DATABASE_PATH = os.getenv('DATABASE_PATH', str(CWD / 'db.sqlite3'))
+DATABASE_PATH = os.getenv('DATABASE_PATH', str(STATEDIR / 'db.sqlite3'))
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -220,7 +221,7 @@ APPRISE_UNCONFIRM_TEMPLATE = os.getenv(
 
 # iCal export settings
 # Path where the iCal file will be written (default: <cwd>/calendar.ics)
-ICAL_EXPORT_PATH = os.getenv('ICAL_EXPORT_PATH', str(CWD / 'calendar.ics'))
+ICAL_EXPORT_PATH = os.getenv('ICAL_EXPORT_PATH', str((STATEDIR / 'calendar.ics')))
 
 # Logging configuration
 LOGGING = {

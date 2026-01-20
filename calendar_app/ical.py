@@ -90,15 +90,14 @@ def generate_ical_content() -> str:
     return '\r\n'.join(lines)
 
 
-def generate_ical_file() -> Path:
+def generate_ical_file( ) -> Path:
     """
     Generate and write the iCal file to the configured path.
     
     Returns:
         Path: The path where the file was written
     """
-    export_path = Path(getattr(settings, 'ICAL_EXPORT_PATH', 'calendar.ics'))
-    
+    export_path = Path(getattr(settings, 'ICAL_EXPORT_PATH'))
     logger.debug(f"Generating iCal file at: {export_path}")
     
     try:
