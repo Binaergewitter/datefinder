@@ -183,6 +183,33 @@
             font-size: 1.2rem;
             color: #ffc107;
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .star-indicator .count {
+            position: absolute;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #333;
+            text-shadow: none;
+        }
+        
+        .count-indicator {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            background: #6c757d;
+            color: white;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .availability-list {
@@ -201,6 +228,19 @@
             overflow: hidden;
             text-overflow: ellipsis;
             max-width: 100%;
+            border: 2px solid transparent;
+        }
+        
+        .availability-item.available {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+        
+        .availability-item.tentative {
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
         }
         
         .legend {
@@ -606,8 +646,15 @@
             // Build cell content
             let html = `<div class="day-number">${day}</div>`;
             
+            // Calculate total count of available/tentative users
+            const totalCount = availability.length;
+            
             if (hasStar) {
-                html += '<div class="star-indicator">⭐</div>';
+                // Show count inside the star
+                html += `<div class="star-indicator">⭐<span class="count">${totalCount}</span></div>`;
+            } else if (totalCount > 0) {
+                // Show count as a simple indicator
+                html += `<div class="count-indicator">${totalCount}</div>`;
             }
             
             // Show other users' availability
