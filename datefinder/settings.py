@@ -171,7 +171,9 @@ LOGIN_URL = '/accounts/login/'
 
 # Registration settings
 REGISTRATION_ENABLED = os.getenv('REGISTRATION_ENABLED', 'false').lower() == 'true'
+LOCAL_LOGIN_ENABLED = os.getenv('LOCAL_LOGIN_ENABLED', 'true').lower() == 'true'
 ACCOUNT_ADAPTER = 'calendar_app.adapters.CustomAccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'calendar_app.adapters.CustomSocialAccountAdapter'
 
 # Keycloak OIDC Provider Configuration
 KEYCLOAK_SERVER_URL = os.getenv('KEYCLOAK_SERVER_URL', '')

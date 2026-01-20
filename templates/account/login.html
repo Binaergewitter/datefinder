@@ -39,10 +39,11 @@
     </ul>
 </div>
 
-<div class="divider">
-    <span>or sign in with credentials</span>
-</div>
 {% endif %}
+{% if local_login_enabled %}
+<div class="divider">
+    <span>or sign in with local credentials</span>
+</div>
 
 <form method="post" action="{% url 'account_login' %}" class="auth-form">
     {% csrf_token %}
@@ -78,6 +79,7 @@
     
     <button type="submit" class="btn btn-primary">Sign In</button>
 </form>
+{% endif %}
 
 {% if registration_enabled %}
 <div class="auth-links">
