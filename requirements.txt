@@ -8,3 +8,5 @@ whitenoise>=6.6.0
 python-dotenv>=1.0.0
 PyJWT>=2.0.0
 cryptography>=3.0.0
+apprise>=1.0.0
+Jinja2>=3.0.0

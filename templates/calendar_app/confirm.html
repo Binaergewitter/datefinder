@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Podcast Date</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        header h1 {
+            color: #333;
+            font-size: 1.5rem;
+        }
+        
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .nav-links a {
+            color: #764ba2;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(118, 75, 162, 0.1);
+        }
+        
+        .logout-btn {
+            background: #764ba2;
+            color: white !important;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        
+        .logout-btn:hover {
+            background: #5a3b7d;
+        }
+        
+        .content-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .content-container h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .description {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+        }
+        
+        .date-list {
+            list-style: none;
+        }
+        
+        .date-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        
+        .date-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .date-item.confirmed {
+            background: #cce5ff;
+            border-color: #007bff;
+        }
+        
+        .date-info {
+            flex: 1;
+        }
+        
+        .date-info h3 {
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+        
+        .date-info .meta {
+            color: #666;
+            font-size: 0.85rem;
+        }
+        
+        .availability-badge {
+            background: #28a745;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            margin-right: 10px;
+        }
+        
+        .confirmed-badge {
+            background: #007bff;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            margin-right: 10px;
+        }
+        
+        .date-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-confirm {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-confirm:hover {
+            background: #0056b3;
+        }
+        
+        .btn-unconfirm {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-unconfirm:hover {
+            background: #c82333;
+        }
+        
+        .confirmed-description {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(0, 123, 255, 0.1);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: #0056b3;
+        }
+        
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal h3 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .modal label {
+            display: block;
+            color: #666;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .modal textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+        
+        .modal textarea:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn-cancel {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-cancel:hover {
+            background: #545b62;
+        }
+        
+        .no-dates {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .no-dates p {
+            margin-bottom: 15px;
+        }
+        
+        .availability-list-mini {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        
+        .availability-list-mini span {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        
+        .availability-list-mini span.available {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .availability-list-mini span.tentative {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .export-link {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+        }
+        
+        .export-link a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        
+        .export-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ Confirm Podcast Date</h1>
+            <div class="nav-links">
+                <a href="{% url 'calendar_app:calendar' %}">← Back to Calendar</a>
+                <a href="{% url 'account_logout' %}" class="logout-btn">Logout</a>
+            </div>
+        </header>
+        
+        <div class="content-container">
+            <h2>Available Dates</h2>
+            <p class="description">
+                Below are future dates with at least 2 people available. Click "Confirm" to officially schedule a podcast recording.
+            </p>
+            
+            {% if candidate_dates %}
+            <ul class="date-list" id="date-list">
+                {% for item in candidate_dates %}
+                <li class="date-item {% if item.is_confirmed %}confirmed{% endif %}" data-date="{{ item.date }}">
+                    <div class="date-info">
+                        <h3>{{ item.date_display }}</h3>
+                        <div class="meta">
+                            <span class="availability-badge">{{ item.count }} available</span>
+                            {% if item.is_confirmed %}
+                            <span class="confirmed-badge">✓ Confirmed</span>
+                            {% endif %}
+                        </div>
+                        <div class="availability-list-mini">
+                            {% for person in item.availability %}
+                            <span class="{{ person.status }}">{{ person.username }}</span>
+                            {% endfor %}
+                        </div>
+                        {% if item.is_confirmed and item.confirmed_info.description %}
+                        <div class="confirmed-description">
+                            {{ item.confirmed_info.description }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="date-actions">
+                        {% if item.is_confirmed %}
+                        <button class="btn btn-unconfirm" onclick="unconfirmDate('{{ item.date }}')">Unconfirm</button>
+                        {% else %}
+                        <button class="btn btn-confirm" onclick="openConfirmModal('{{ item.date }}', '{{ item.date_display }}')">Confirm</button>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="no-dates">
+                <p>No dates with 2+ people available yet.</p>
+                <a href="{% url 'calendar_app:calendar' %}">Go to calendar to add availability</a>
+            </div>
+            {% endif %}
+            
+            <div class="export-link">
+                <a href="{% url 'calendar_app:export_csv' %}" target="_blank">📥 Download Calendar CSV</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirm Modal -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal">
+            <h3>Confirm Date: <span id="modal-date-display"></span></h3>
+            <label for="description">Description (optional):</label>
+            <textarea id="description" placeholder="e.g., Episode 42 - Special Guest Interview"></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeConfirmModal()">Cancel</button>
+                <button class="btn btn-confirm" onclick="confirmDate()">Confirm Date</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const csrfToken = '{{ csrf_token }}';
+        let selectedDate = null;
+        
+        function openConfirmModal(date, dateDisplay) {
+            selectedDate = date;
+            document.getElementById('modal-date-display').textContent = dateDisplay;
+            document.getElementById('description').value = '';
+            document.getElementById('confirm-modal').classList.add('active');
+        }
+        
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').classList.remove('active');
+            selectedDate = null;
+        }
+        
+        async function confirmDate() {
+            if (!selectedDate) return;
+            
+            const description = document.getElementById('description').value;
+            
+            try {
+                const response = await fetch(`/calendar/api/confirm/${selectedDate}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ description }),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Reload the page to show updated state
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Failed to confirm date');
+                }
+            } catch (error) {
+                console.error('Error confirming date:', error);
+                alert('Failed to confirm date');
+            }
+            
+            closeConfirmModal();
+        }
+        
+        async function unconfirmDate(date) {
+            if (!confirm('Are you sure you want to unconfirm this date?')) return;
+            
+            try {
+                const response = await fetch(`/calendar/api/unconfirm/${date}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Reload the page to show updated state
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Failed to unconfirm date');
+                }
+            } catch (error) {
+                console.error('Error unconfirming date:', error);
+                alert('Failed to unconfirm date');
+            }
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('confirm-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeConfirmModal();
+            }
+        });
+        
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeConfirmModal();
+            }
+        });
+    </script>
+</body>
+</html>

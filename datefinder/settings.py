@@ -201,3 +201,19 @@ SOCIALACCOUNT_PROVIDERS = {
 # Allauth socialaccount settings
 SOCIALACCOUNT_AUTO_SIGNUP = True
 SOCIALACCOUNT_LOGIN_ON_GET = True
+
+# Apprise notification settings
+# Configure notification URLs (e.g., 'slack://...', 'discord://...', 'mailto://...')
+# See https://github.com/caronc/apprise for supported services
+APPRISE_URLS = [url.strip() for url in os.getenv('APPRISE_URLS', '').split(',') if url.strip()]
+
+# Jinja2 templates for notification messages
+# Available variables: date, date_formatted, description, confirmed_by, site_url
+APPRISE_CONFIRM_TEMPLATE = os.getenv(
+    'APPRISE_CONFIRM_TEMPLATE',
+    '{{ description }}'
+)
+APPRISE_UNCONFIRM_TEMPLATE = os.getenv(
+    'APPRISE_UNCONFIRM_TEMPLATE', 
+    'Date {{ date_formatted }} has been unconfirmed.'
+)

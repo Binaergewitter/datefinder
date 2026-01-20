@@ -170,6 +170,27 @@
             border-color: #ffc107;
         }
         
+        .calendar-day.confirmed {
+            background: #cce5ff;
+            border-color: #007bff;
+        }
+        
+        .calendar-day.confirmed.user-available {
+            background: linear-gradient(135deg, #cce5ff 50%, #d4edda 50%);
+        }
+        
+        .calendar-day.confirmed.user-tentative {
+            background: linear-gradient(135deg, #cce5ff 50%, #fff3cd 50%);
+        }
+        
+        .confirmed-indicator {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            font-size: 1rem;
+            color: #007bff;
+        }
+        
         .day-number {
             font-weight: 600;
             color: #333;
@@ -282,6 +303,11 @@
         
         .legend-color.others-tentative {
             background: #ff8c00;
+        }
+        
+        .legend-color.confirmed {
+            background: #cce5ff;
+            border: 2px solid #007bff;
         }
         
         .connection-status {
@@ -459,6 +485,13 @@
                 <div class="legend-item">
                     <span>⭐ = 3+ people available</span>
                 </div>
+                <div class="legend-item">
+                    <div class="legend-color confirmed"></div>
+                    <span>Confirmed Date</span>
+                </div>
+            </div>
+            <div style="margin-top: 15px; text-align: center;">
+                <a href="{% url 'calendar_app:confirm' %}" style="color: #007bff; text-decoration: none; font-weight: 500;">📅 Go to Confirm View →</a>
             </div>
         </div>
     </div>
@@ -471,6 +504,7 @@
     <script>
         // Store availability data
         let availabilityData = {};
+        let confirmedDates = {};
         let currentUserId = null;
         let currentDate = new Date();
         let socket = null;
@@ -481,6 +515,7 @@
         // Initialize the calendar
         document.addEventListener('DOMContentLoaded', function() {
             loadAvailabilityData();
+            loadConfirmedDates();
             connectWebSocket();
             
             document.getElementById('prev-month').addEventListener('click', () => {
@@ -506,6 +541,20 @@
                 }
             } catch (error) {
                 console.error('Error loading availability:', error);
+            }
+        }
+        
+        // Load confirmed dates
+        async function loadConfirmedDates() {
+            try {
+                const response = await fetch('/calendar/api/confirmed/');
+                const data = await response.json();
+                if (data.success) {
+                    confirmedDates = data.data;
+                    renderCalendar();
+                }
+            } catch (error) {
+                console.error('Error loading confirmed dates:', error);
             }
         }
         
@@ -540,6 +589,18 @@
                         };
                     } else {
                         delete availabilityData[data.date];
+                    }
+                    // Re-render the affected day
+                    updateDayCell(data.date);
+                } else if (data.type === 'confirmation_update') {
+                    // Update confirmed dates
+                    if (data.confirmed) {
+                        confirmedDates[data.date] = {
+                            description: data.description,
+                            confirmed_by: data.confirmed_by
+                        };
+                    } else {
+                        delete confirmedDates[data.date];
                     }
                     // Re-render the affected day
                     updateDayCell(data.date);
@@ -636,11 +697,17 @@
             const userStatus = userEntry ? userEntry.status : null;
             
             // Update cell classes
-            dayCell.classList.remove('user-available', 'user-tentative');
+            dayCell.classList.remove('user-available', 'user-tentative', 'confirmed');
             if (userStatus === 'available') {
                 dayCell.classList.add('user-available');
             } else if (userStatus === 'tentative') {
                 dayCell.classList.add('user-tentative');
+            }
+            
+            // Check if confirmed
+            const isConfirmed = confirmedDates.hasOwnProperty(dateStr);
+            if (isConfirmed) {
+                dayCell.classList.add('confirmed');
             }
             
             // Build cell content
@@ -666,6 +733,11 @@
                     html += `<div class="availability-item ${statusClass}">${escapeHtml(user.username)}</div>`;
                 }
                 html += '</div>';
+            }
+            
+            // Show confirmed indicator
+            if (isConfirmed) {
+                html += '<div class="confirmed-indicator">✓</div>';
             }
             
             dayCell.innerHTML = html;

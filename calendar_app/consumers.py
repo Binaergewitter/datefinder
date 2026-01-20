@@ -55,3 +55,16 @@ class CalendarConsumer(AsyncWebsocketConsumer):
             'availability': event['availability'],
             'has_star': event['has_star'],
         }))
+
+    async def confirmation_update(self, event):
+        """
+        Called when a confirmation update is broadcast to the group.
+        Sends the update to the WebSocket.
+        """
+        await self.send(text_data=json.dumps({
+            'type': 'confirmation_update',
+            'date': event['date'],
+            'confirmed': event['confirmed'],
+            'description': event['description'],
+            'confirmed_by': event['confirmed_by'],
+        }))

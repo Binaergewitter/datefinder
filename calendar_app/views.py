@@ -1,13 +1,16 @@
 import json
+import csv
 from datetime import date as date_type, timedelta
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Count
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from .models import Availability
+from .models import Availability, ConfirmedDate
+from .hooks import run_confirm_hooks, run_unconfirm_hooks
 
 
 @login_required
@@ -104,3 +107,204 @@ def get_all_availability(request):
         'current_user_id': request.user.id,
         'data': result,
     })
+
+
+@login_required
+def confirm_list_view(request):
+    """
+    View showing future dates with 2+ availabilities for confirmation.
+    """
+    today = date_type.today()
+    
+    # Get dates with 2+ availabilities
+    dates_with_availability = (
+        Availability.objects.filter(date__gte=today)
+        .values('date')
+        .annotate(count=Count('id'))
+        .filter(count__gte=2)
+        .order_by('date')
+    )
+    
+    # Get confirmed dates
+    confirmed_dates = set(
+        ConfirmedDate.objects.filter(date__gte=today)
+        .values_list('date', flat=True)
+    )
+    
+    # Build result with availability details
+    candidate_dates = []
+    for item in dates_with_availability:
+        d = item['date']
+        availability = Availability.get_date_availability(d)
+        is_confirmed = d in confirmed_dates
+        confirmed_info = None
+        if is_confirmed:
+            confirmed_obj = ConfirmedDate.objects.get(date=d)
+            confirmed_info = {
+                'description': confirmed_obj.description,
+                'confirmed_by': confirmed_obj.confirmed_by.get_full_name() or confirmed_obj.confirmed_by.username if confirmed_obj.confirmed_by else 'Unknown',
+            }
+        candidate_dates.append({
+            'date': d.isoformat(),
+            'date_display': d.strftime('%A, %B %d, %Y'),
+            'count': item['count'],
+            'availability': availability,
+            'is_confirmed': is_confirmed,
+            'confirmed_info': confirmed_info,
+        })
+    
+    return render(request, 'calendar_app/confirm.html', {
+        'user': request.user,
+        'candidate_dates': candidate_dates,
+    })
+
+
+@login_required
+@require_POST
+def confirm_date(request, date):
+    """
+    Confirm a date as the next podcasting date.
+    """
+    date_str = date
+    try:
+        target_date = date_type.fromisoformat(date_str)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid date format'}, status=400)
+    
+    # Only allow confirming future dates
+    if target_date < date_type.today():
+        return JsonResponse({'error': 'Cannot confirm past dates'}, status=400)
+    
+    # Check if date has 2+ availabilities
+    availability_count = Availability.count_available(target_date)
+    if availability_count < 2:
+        return JsonResponse({'error': 'Date must have at least 2 available users'}, status=400)
+    
+    # Get description from request body
+    try:
+        body = json.loads(request.body)
+        description = body.get('description', '')
+    except json.JSONDecodeError:
+        description = ''
+    
+    # Create or update confirmed date
+    confirmed, created = ConfirmedDate.objects.update_or_create(
+        date=target_date,
+        defaults={
+            'description': description,
+            'confirmed_by': request.user,
+        }
+    )
+    
+    # Broadcast update to all connected clients via WebSocket
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        "calendar_updates",
+        {
+            "type": "confirmation_update",
+            "date": date_str,
+            "confirmed": True,
+            "description": description,
+            "confirmed_by": request.user.get_full_name() or request.user.username,
+        }
+    )
+    
+    # Run post-action hooks
+    run_confirm_hooks(target_date, description, request.user)
+    
+    return JsonResponse({
+        'success': True,
+        'date': date_str,
+        'confirmed': True,
+        'description': description,
+    })
+
+
+@login_required
+@require_POST
+def unconfirm_date(request, date):
+    """
+    Remove confirmation from a date.
+    """
+    date_str = date
+    try:
+        target_date = date_type.fromisoformat(date_str)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid date format'}, status=400)
+    
+    # Delete confirmed date if exists
+    deleted, _ = ConfirmedDate.objects.filter(date=target_date).delete()
+    
+    if deleted:
+        # Broadcast update to all connected clients via WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "calendar_updates",
+            {
+                "type": "confirmation_update",
+                "date": date_str,
+                "confirmed": False,
+                "description": "",
+                "confirmed_by": "",
+            }
+        )
+        
+        # Run post-action hooks
+        run_unconfirm_hooks(target_date)
+    
+    return JsonResponse({
+        'success': True,
+        'date': date_str,
+        'confirmed': False,
+    })
+
+
+@login_required
+@require_GET
+def get_confirmed_dates(request):
+    """
+    Get all confirmed dates.
+    """
+    today = date_type.today()
+    confirmed = ConfirmedDate.objects.filter(date__gte=today).select_related('confirmed_by')
+    
+    result = {}
+    for entry in confirmed:
+        result[entry.date.isoformat()] = {
+            'description': entry.description,
+            'confirmed_by': entry.confirmed_by.get_full_name() or entry.confirmed_by.username if entry.confirmed_by else 'Unknown',
+            'created_at': entry.created_at.isoformat(),
+        }
+    
+    return JsonResponse({
+        'success': True,
+        'data': result,
+    })
+
+
+@require_GET
+def export_csv(request):
+    """
+    Export confirmed dates as a public CSV calendar.
+    No authentication required - nginx will handle caching.
+    """
+    confirmed = ConfirmedDate.objects.all().order_by('date')
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="podcast_calendar.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Date', 'Description', 'Confirmed By', 'Created At'])
+    
+    for entry in confirmed:
+        confirmed_by = ''
+        if entry.confirmed_by:
+            confirmed_by = entry.confirmed_by.get_full_name() or entry.confirmed_by.username
+        writer.writerow([
+            entry.date.isoformat(),
+            entry.description,
+            confirmed_by,
+            entry.created_at.isoformat(),
+        ])
+    
+    return response
