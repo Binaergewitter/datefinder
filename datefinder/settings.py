@@ -222,6 +222,8 @@ APPRISE_UNCONFIRM_TEMPLATE = os.getenv(
 # iCal export settings
 # Path where the iCal file will be written (default: <cwd>/calendar.ics)
 ICAL_EXPORT_PATH = os.getenv('ICAL_EXPORT_PATH', str((STATEDIR / 'calendar.ics')))
+# Timezone for iCal events (default: Europe/Berlin)
+ICAL_TIMEZONE = os.getenv('ICAL_TIMEZONE', 'Europe/Berlin')
 
 # Logging configuration
 LOGGING = {

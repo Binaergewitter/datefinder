@@ -10,6 +10,7 @@ The file is regenerated:
 import logging
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,10 @@ def generate_ical_content() -> str:
     
     confirmed = ConfirmedDate.objects.all().order_by('date').select_related('confirmed_by')
     
+    # Get timezone from settings (default: Europe/Berlin)
+    tz_name = getattr(settings, 'ICAL_TIMEZONE', 'Europe/Berlin')
+    tz = ZoneInfo(tz_name)
+    
     # Build iCal content
     lines = [
         'BEGIN:VCALENDAR',
@@ -47,19 +52,26 @@ def generate_ical_content() -> str:
         'CALSCALE:GREGORIAN',
         'METHOD:PUBLISH',
         'X-WR-CALNAME:Binärgewitter Live Podcast Schedule',
+        'X-WR-TIMEZONE:UTC',
+
     ]
     
     for entry in confirmed:
-        # Create datetime for 20:00-23:00 on the confirmed date
-        start_dt = datetime.combine(entry.date, datetime.strptime('20:00', '%H:%M').time())
-        end_dt = datetime.combine(entry.date, datetime.strptime('23:00', '%H:%M').time())
+        # Create datetime for 20:00-23:00 on the confirmed date in the configured timezone
+        start_dt = datetime.combine(entry.date, datetime.strptime('20:00', '%H:%M').time(), tzinfo=tz)
+        end_dt = datetime.combine(entry.date, datetime.strptime('23:00', '%H:%M').time(), tzinfo=tz)
+        
+        # Convert to UTC for iCal
+        utc = ZoneInfo('UTC')
+        start_utc = start_dt.astimezone(utc)
+        end_utc = end_dt.astimezone(utc)
         
         # Generate a stable UID based on the date
         uid = f"{entry.date.isoformat()}-podcast@datefinder"
         
-        # Format timestamps for iCal (local time)
-        dtstart = start_dt.strftime('%Y%m%dT%H%M%S')
-        dtend = end_dt.strftime('%Y%m%dT%H%M%S')
+        # Format timestamps for iCal in UTC (Z suffix)
+        dtstart = start_utc.strftime('%Y%m%dT%H%M%SZ')
+        dtend = end_utc.strftime('%Y%m%dT%H%M%SZ')
         dtstamp = entry.created_at.strftime('%Y%m%dT%H%M%SZ')
         
         # Get organizer info
@@ -68,8 +80,9 @@ def generate_ical_content() -> str:
             organizer = entry.confirmed_by.get_full_name() or entry.confirmed_by.username
         
         # Build event
-        summary = entry.description if entry.description else 'Podcast Recording'
-        description = f"Confirmed by: {organizer}" if organizer else ''
+        summary = "Binärgewitter Podcast"
+        description = entry.description if entry.description else 'Podcast Recording'
+        description += f"\nConfirmed by: {organizer}" if organizer else ''
         
         lines.extend([
             'BEGIN:VEVENT',

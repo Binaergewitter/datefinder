@@ -159,6 +159,10 @@ DATABASE_PATH=/var/lib/datefinder/db.sqlite3
 # Path where the iCal export file will be written
 # Default: <STATEDIR>/calendar.ics
 ICAL_EXPORT_PATH=/var/lib/datefinder/calendar.ics
+
+# Timezone for iCal events (times are converted to UTC)
+# Default: Europe/Berlin
+ICAL_TIMEZONE=Europe/Berlin
 ```
 
 ### Additional Configuration
