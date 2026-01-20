@@ -18,6 +18,9 @@ A Django web application that helps a group of friends find a common meeting dat
   - Orange labels for tentatively available users
 - **Star Indicator**: Dates with 3+ people available are marked with a ⭐
 - **Configurable Registration**: User registration can be enabled/disabled via environment variable (disabled by default)
+- **Date Confirmation**: Confirm dates with 1+ availabilities as official podcast recording dates
+- **Notifications**: Send notifications via Apprise when dates are confirmed/unconfirmed
+- **iCal Export**: Public iCal feed for subscribing to confirmed podcast dates
 
 ## Setup
 
@@ -141,6 +144,57 @@ REGISTRATION_ENABLED=true
 LOCAL_LOGIN_ENABLED=true
 ```
 
+### Notification Configuration (Apprise)
+
+The application can send notifications when podcast dates are confirmed or unconfirmed using the [Apprise](https://github.com/caronc/apprise) library. Apprise supports 90+ notification services including Slack, Discord, Telegram, Email, and more.
+
+#### Environment Variables
+
+```bash
+# Comma-separated list of Apprise notification URLs
+# See https://github.com/caronc/apprise/wiki for all supported services
+APPRISE_URLS=slack://tokenA/tokenB/tokenC,discord://webhook_id/webhook_token
+
+# Optional: Jinja2 template for confirm notification message
+# Available variables: date, date_formatted, description, confirmed_by, site_url
+APPRISE_CONFIRM_TEMPLATE={{ description }}
+
+# Optional: Jinja2 template for unconfirm notification message
+# Available variables: date, date_formatted
+APPRISE_UNCONFIRM_TEMPLATE=Date {{ date_formatted }} has been unconfirmed.
+```
+
+#### Example Notification URLs
+
+| Service | URL Format |
+|---------|------------|
+| Slack | `slack://tokenA/tokenB/tokenC` |
+| Discord | `discord://webhook_id/webhook_token` |
+| Telegram | `tgram://bot_token/chat_id` |
+| Email (SMTP) | `mailto://user:pass@gmail.com` |
+| Gotify | `gotify://hostname/token` |
+| Ntfy | `ntfy://topic` |
+| Matrix | `matrix://user:pass@hostname/#room` |
+
+For the complete list of supported services, see the [Apprise Wiki](https://github.com/caronc/apprise/wiki).
+
+#### Custom Notification Templates
+
+You can customize the notification message using Jinja2 templates. Available variables:
+
+| Variable | Description |
+|----------|-------------|
+| `date` | ISO format date (e.g., `2026-01-25`) |
+| `date_formatted` | Human-readable date (e.g., `Sunday, January 25, 2026`) |
+| `description` | The description entered when confirming |
+| `confirmed_by` | Username of the person who confirmed |
+| `site_url` | The configured SITE_URL |
+
+Example template:
+```bash
+APPRISE_CONFIRM_TEMPLATE=🎙️ Podcast scheduled: {{ description }} on {{ date_formatted }} (confirmed by {{ confirmed_by }})
+```
+
 Example nginx configuration:
 ```nginx
 server {
@@ -178,6 +232,9 @@ server {
    - Third click → Remove marker
 6. See other users' availability displayed on each date
 7. Look for the ⭐ indicator on dates where 3+ people are available
+8. Visit the **Confirm** page to officially confirm dates with 2+ availabilities
+9. Confirmed dates appear in blue on the calendar
+10. Subscribe to the iCal feed at `/calendar/export/calendar.ics`
 
 ## Project Structure
 

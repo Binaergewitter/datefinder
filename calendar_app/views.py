@@ -126,7 +126,7 @@ def confirm_list_view(request):
         Availability.objects.filter(date__gte=today)
         .values('date')
         .annotate(count=Count('id'))
-        .filter(count__gte=2)
+        .filter(count__gte=1) # at least one confirmation
         .order_by('date')
     )
     
