@@ -1,0 +1,323 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcast Date Finder - News</title>
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/news.css' %}">
+</head>
+<body class="news-page">
+    <div class="container">
+        <header>
+            <h1>🎙️ Podcast Date Finder</h1>
+            <div class="header-actions">
+                <a href="{% url 'calendar_app:calendar' %}" class="nav-pill">Calendar</a>
+                <a href="{% url 'calendar_app:news' %}" class="nav-pill active">RSS</a>
+                <a href="{% url 'calendar_app:notes' %}" class="nav-pill">Notes</a>
+            </div>
+            <div class="user-info">
+                <span>Welcome, <strong>{{ user.get_full_name|default:user.username }}</strong></span>
+                <a href="{% url 'account_logout' %}" class="logout-btn">Logout</a>
+            </div>
+        </header>
+
+        <div class="news-panel">
+            <div class="news-header">
+                <h3>📰 News</h3>
+                <div class="news-controls">
+                    <button id="toggle-add">Add RSS</button>
+                    <select id="news-range">
+                        <option value="7">Last 7 days</option>
+                        <option value="3">Last 3 days</option>
+                        <option value="14">Last 14 days</option>
+                        <option value="30">Last 30 days</option>
+                    </select>
+                    <select id="news-limit">
+                        <option value="20">Show 20</option>
+                        <option value="10">Show 10</option>
+                        <option value="30">Show 30</option>
+                        <option value="50">Show 50</option>
+                    </select>
+                    <button id="refresh-news">Refresh</button>
+                </div>
+            </div>
+            <div class="modal-backdrop" id="rss-modal" aria-hidden="true">
+                <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="rss-modal-title">
+                    <div class="modal-header">
+                        <h4 id="rss-modal-title">Add RSS Feed</h4>
+                        <button class="modal-close" id="rss-close" aria-label="Close">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="modal-field">
+                            <span>Feed name (optional)</span>
+                            <input type="text" id="feed-title" placeholder="My favorite news site" />
+                        </label>
+                        <label class="modal-field">
+                            <span>RSS URL</span>
+                            <input type="url" id="feed-url" placeholder="https://example.com/rss" />
+                        </label>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="ghost" id="rss-cancel">Cancel</button>
+                        <button class="primary" id="add-feed">Add</button>
+                    </div>
+                </div>
+            </div>
+            <div class="feed-list" id="feed-list"></div>
+            <div class="news-list" id="news-list"></div>
+        </div>
+    </div>
+
+    <script>
+        const csrfToken = '{{ csrf_token }}';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFeeds();
+            refreshNews();
+            document.getElementById('toggle-add').addEventListener('click', openModal);
+            document.getElementById('rss-close').addEventListener('click', closeModal);
+            document.getElementById('rss-cancel').addEventListener('click', closeModal);
+            document.getElementById('rss-modal').addEventListener('click', onBackdropClick);
+            document.getElementById('add-feed').addEventListener('click', addFeed);
+            document.getElementById('refresh-news').addEventListener('click', refreshNews);
+            document.getElementById('news-range').addEventListener('change', refreshNews);
+            document.getElementById('news-limit').addEventListener('change', refreshNews);
+            document.addEventListener('keydown', onKeyDown);
+        });
+
+        function openModal() {
+            const modal = document.getElementById('rss-modal');
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            setTimeout(() => document.getElementById('feed-url').focus(), 0);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('rss-modal');
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function onBackdropClick(event) {
+            if (event.target.id === 'rss-modal') {
+                closeModal();
+            }
+        }
+
+        function onKeyDown(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+            }
+        }
+
+        async function loadFeeds() {
+            try {
+                const response = await fetch('/calendar/api/rss/feeds/');
+                const data = await response.json();
+                if (data.success) {
+                    renderFeeds(data.data);
+                }
+            } catch (error) {
+                console.error('Error loading feeds:', error);
+            }
+        }
+
+        function renderFeeds(feeds) {
+            const list = document.getElementById('feed-list');
+            list.innerHTML = '';
+            if (!feeds.length) {
+                list.innerHTML = '<div class="news-empty">No RSS feeds yet. Add one above.</div>';
+                return;
+            }
+            for (const feed of feeds) {
+                const card = document.createElement('div');
+                card.className = 'feed-card';
+                card.innerHTML = `
+                    <div class="feed-title">${escapeHtml(feed.title || 'Untitled Feed')}</div>
+                    <div class="feed-url">${escapeHtml(feed.url)}</div>
+                    <div class="feed-actions">
+                        <button data-id="${feed.id}" class="toggle">${feed.is_active ? 'Disable' : 'Enable'}</button>
+                        <button data-id="${feed.id}" class="delete">Delete</button>
+                    </div>
+                `;
+                card.querySelector('.toggle').addEventListener('click', () => toggleFeed(feed.id));
+                card.querySelector('.delete').addEventListener('click', () => deleteFeed(feed.id));
+                list.appendChild(card);
+            }
+        }
+
+        async function addFeed() {
+            const titleEl = document.getElementById('feed-title');
+            const urlEl = document.getElementById('feed-url');
+            const title = titleEl.value.trim();
+            const url = urlEl.value.trim();
+            if (!url) {
+                alert('Please enter an RSS URL.');
+                return;
+            }
+            try {
+                const response = await fetch('/calendar/api/rss/add/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ title, url })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    titleEl.value = '';
+                    urlEl.value = '';
+                    closeModal();
+                    loadFeeds();
+                    refreshNews();
+                } else {
+                    alert(data.error || 'Could not add feed.');
+                }
+            } catch (error) {
+                console.error('Error adding feed:', error);
+            }
+        }
+
+        async function deleteFeed(feedId) {
+            if (!confirm('Delete this feed?')) return;
+            try {
+                const response = await fetch(`/calendar/api/rss/${feedId}/delete/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    loadFeeds();
+                    refreshNews();
+                }
+            } catch (error) {
+                console.error('Error deleting feed:', error);
+            }
+        }
+
+        async function toggleFeed(feedId) {
+            try {
+                const response = await fetch(`/calendar/api/rss/${feedId}/toggle/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    loadFeeds();
+                    refreshNews();
+                }
+            } catch (error) {
+                console.error('Error toggling feed:', error);
+            }
+        }
+
+        function parseDate(text) {
+            if (!text) return null;
+            const parsed = Date.parse(text);
+            if (!isNaN(parsed)) return new Date(parsed);
+            return null;
+        }
+
+        function isWithinDays(dateObj, days) {
+            if (!dateObj) return true;
+            const now = new Date();
+            const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+            return dateObj >= cutoff;
+        }
+
+        async function refreshNews() {
+            const rangeDays = parseInt(document.getElementById('news-range').value, 10);
+            const limit = parseInt(document.getElementById('news-limit').value, 10);
+            const list = document.getElementById('news-list');
+            list.innerHTML = '<div class="news-empty">Loading news…</div>';
+            try {
+                const response = await fetch(`/calendar/api/rss/news/?limit=${encodeURIComponent(limit)}`);
+                const data = await response.json();
+                if (data.success) {
+                    const filtered = data.data.filter(item => isWithinDays(parseDate(item.published), rangeDays));
+                    renderNews(filtered);
+                } else {
+                    list.innerHTML = '<div class="news-empty">Could not load news.</div>';
+                }
+            } catch (error) {
+                console.error('Error loading news:', error);
+                list.innerHTML = '<div class="news-empty">Could not load news.</div>';
+            }
+        }
+
+        function renderNews(items) {
+            const list = document.getElementById('news-list');
+            list.innerHTML = '';
+            if (!items.length) {
+                list.innerHTML = '<div class="news-empty">No news in this range.</div>';
+                return;
+            }
+            for (const item of items) {
+                const card = document.createElement('div');
+                card.className = 'news-item';
+                const title = escapeHtml(item.title || item.link || 'Untitled');
+                const link = escapeHtml(item.link || '#');
+                const source = escapeHtml(item.source_title || '');
+                const published = escapeHtml(item.published || '');
+                card.innerHTML = `
+                    <div class="news-row">
+                        <div class="news-title">
+                            <a href="${link}" target="_blank" rel="noopener">${title}</a>
+                        </div>
+                        <button class="add-note" data-title="${escapeHtml(item.title || '')}" data-link="${escapeHtml(item.link || '')}">
+                            <span class="add-note-icon">＋</span>
+                            Add to notes
+                        </button>
+                    </div>
+                    <div class="news-meta">${source}${published ? ' • ' + published : ''}</div>
+                `;
+                card.querySelector('.add-note').addEventListener('click', () => addNoteFromItem(item));
+                list.appendChild(card);
+            }
+        }
+
+        async function addNoteFromItem(item) {
+            const title = (item.title || '').trim();
+            const link = (item.link || '').trim();
+            const text = title && link ? `${title} - ${link}` : (title || link);
+            if (!text) {
+                alert('Nothing to add.');
+                return;
+            }
+            try {
+                const response = await fetch('/calendar/api/notes/add/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert('Added to notes.');
+                } else {
+                    alert(data.error || 'Could not add note.');
+                }
+            } catch (error) {
+                console.error('Error adding note:', error);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

@@ -89,3 +89,38 @@ class Availability(models.Model):
         except cls.DoesNotExist:
             entry = cls.objects.create(user=user, date=date, status='available')
             return 'available'
+
+
+class RSSFeed(models.Model):
+    """
+    User-managed RSS feeds for the News section.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='rss_feeds')
+    title = models.CharField(max_length=200, blank=True, default='')
+    url = models.URLField(max_length=500)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['user', 'url']
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.title or self.url}"
+
+
+class Note(models.Model):
+    """
+    User notes for the RSS/Notes tab.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notes')
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.text[:40]}"
