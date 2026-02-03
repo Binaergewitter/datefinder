@@ -2,7 +2,9 @@
 
 A Django web application that helps a group of friends find a common meeting date for recording a podcast.
 
-100% vibe-coded by Claude Opus 4.5
+99% vibe-coded by
+- **Cloud Opus 4.5**
+- **GPT-5.2-Codex Low**
 
 ## Features
 

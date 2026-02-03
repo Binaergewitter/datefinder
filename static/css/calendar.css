@@ -1,0 +1,623 @@
+.calendar-page .calendar-container {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.calendar-header h2 {
+    color: #333;
+    font-size: 1.3rem;
+}
+
+.nav-btn {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.2s;
+}
+
+.nav-btn:hover {
+    background: #5a6fd6;
+}
+
+.weekday-header {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 5px;
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+.weekday {
+    text-align: center;
+    font-weight: 600;
+    color: #666;
+    padding: 10px;
+    overflow: hidden;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 5px;
+    width: 100%;
+}
+
+.calendar-day {
+    min-height: 120px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    border: 2px solid transparent;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.calendar-day:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.calendar-day.past {
+    background: #e9ecef;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.calendar-day.past:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.calendar-day.empty {
+    background: transparent;
+    cursor: default;
+}
+
+.calendar-day.empty:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.calendar-day.user-available {
+    background: #d4edda;
+    border-color: #28a745;
+}
+
+.calendar-day.user-tentative {
+    background: #fff3cd;
+    border-color: #ffc107;
+}
+
+.calendar-day.confirmed {
+    background: #cce5ff;
+    border-color: #007bff;
+}
+
+.calendar-day.confirmed.user-available {
+    background: linear-gradient(135deg, #cce5ff 50%, #d4edda 50%);
+}
+
+.calendar-day.confirmed.user-tentative {
+    background: linear-gradient(135deg, #cce5ff 50%, #fff3cd 50%);
+}
+
+.confirmed-indicator {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    font-size: 1rem;
+    color: #007bff;
+}
+
+.day-number {
+    font-weight: 600;
+    color: #333;
+    font-size: 1.1rem;
+}
+
+.star-indicator {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 1.2rem;
+    color: #ffc107;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.star-indicator .count {
+    position: absolute;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #333;
+    text-shadow: none;
+}
+
+.count-indicator {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    background: #6c757d;
+    color: white;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.availability-list {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    max-height: 70px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.availability-item {
+    padding: 2px 4px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    border: 2px solid transparent;
+}
+
+.availability-item.available {
+    background: #d4edda;
+    border-color: #28a745;
+    color: #155724;
+}
+
+.availability-item.tentative {
+    background: #fff3cd;
+    border-color: #ffc107;
+    color: #856404;
+}
+
+.legend {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+}
+
+.legend-color.available {
+    background: #d4edda;
+    border: 2px solid #28a745;
+}
+
+.legend-color.tentative {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+}
+
+.legend-color.others-available {
+    background: #155724;
+}
+
+.legend-color.others-tentative {
+    background: #ff8c00;
+}
+
+.legend-color.confirmed {
+    background: #cce5ff;
+    border: 2px solid #007bff;
+}
+
+.connection-status {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.connection-status.connected {
+    background: #d4edda;
+    color: #155724;
+}
+
+.connection-status.disconnected {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.status-dot.connected {
+    background: #28a745;
+}
+
+.status-dot.disconnected {
+    background: #dc3545;
+}
+
+/* Confirm page */
+.confirm-page .container {
+    max-width: 900px;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.nav-links a {
+    color: #764ba2;
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.nav-links a:hover {
+    background: rgba(118, 75, 162, 0.1);
+}
+
+.confirm-page .content-container {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.confirm-page .content-container h2 {
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.confirm-page .description {
+    color: #666;
+    margin-bottom: 20px;
+    font-size: 0.95rem;
+}
+
+.confirm-page .date-list {
+    list-style: none;
+}
+
+.confirm-page .date-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+}
+
+.confirm-page .date-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.confirm-page .date-item.confirmed {
+    background: #cce5ff;
+    border-color: #007bff;
+}
+
+.confirm-page .date-info {
+    flex: 1;
+}
+
+.confirm-page .date-info h3 {
+    color: #333;
+    margin-bottom: 5px;
+    font-size: 1.1rem;
+}
+
+.confirm-page .date-info .meta {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.availability-badge {
+    background: #28a745;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin-right: 10px;
+}
+
+.confirmed-badge {
+    background: #007bff;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin-right: 10px;
+}
+
+.confirm-page .date-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.confirm-page .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.btn-confirm {
+    background: #007bff;
+    color: white;
+}
+
+.btn-confirm:hover {
+    background: #0056b3;
+}
+
+.btn-unconfirm {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-unconfirm:hover {
+    background: #c82333;
+}
+
+.confirm-page .confirmed-description {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(0, 123, 255, 0.1);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #0056b3;
+}
+
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal h3 {
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.modal label {
+    display: block;
+    color: #666;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.modal textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    resize: vertical;
+    min-height: 100px;
+    font-family: inherit;
+}
+
+.modal textarea:focus {
+    outline: none;
+    border-color: #007bff;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn-cancel {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-cancel:hover {
+    background: #545b62;
+}
+
+.no-dates {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+.no-dates p {
+    margin-bottom: 15px;
+}
+
+.availability-list-mini {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.availability-list-mini span {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.availability-list-mini span.available {
+    background: #d4edda;
+    color: #155724;
+}
+
+.availability-list-mini span.tentative {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.export-link {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    text-align: center;
+}
+
+.export-link a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.export-link a:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+    .calendar-day {
+        min-height: 80px;
+        padding: 4px;
+    }
+
+    .day-number {
+        font-size: 0.9rem;
+    }
+
+    .availability-list {
+        font-size: 0.65rem;
+    }
+
+    header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+
+    .fc .fc-button {
+        padding: 0.3em 0.5em;
+        font-size: 0.85em;
+    }
+
+    .fc .fc-toolbar {
+        flex-wrap: wrap;
+        gap: 0.5em;
+    }
+
+    .fc .fc-toolbar-title {
+        font-size: 1.1em;
+    }
+
+    .fc .fc-col-header-cell {
+        padding: 0.25em 0;
+    }
+
+    .fc .fc-col-header-cell-cushion {
+        padding: 2px;
+        font-size: 0.75em;
+    }
+
+    .fc .fc-scrollgrid-sync-table {
+        width: 100% !important;
+    }
+
+    .fc .fc-daygrid-body {
+        width: 100% !important;
+    }
+
+    .fc .fc-scrollgrid-sync-inner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .fc .fc-col-header,
+    .fc .fc-daygrid-body {
+        width: 100% !important;
+    }
+
+    .fc table {
+        table-layout: fixed;
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .fc .fc-button {
+        padding: 0.2em 0.4em;
+        font-size: 0.75em;
+    }
+
+    .fc .fc-toolbar-title {
+        font-size: 1em;
+    }
+
+    .fc .fc-col-header-cell-cushion {
+        font-size: 0.65em;
+    }
+}

@@ -1,0 +1,335 @@
+.news-panel {
+    margin-top: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.news-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.news-header h3 {
+    color: #333;
+    font-size: 1.2rem;
+}
+
+.news-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.news-controls select,
+.news-controls input {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 0.95rem;
+}
+
+.news-controls button {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.news-controls button:hover {
+    background: #5a6fd6;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 18, 28, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 50;
+}
+
+.modal-backdrop.active {
+    display: flex;
+}
+
+.modal-card {
+    width: min(520px, 95vw);
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    padding: 18px 18px 14px;
+    animation: pop-in 0.18s ease-out;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.modal-header h4 {
+    margin: 0;
+    color: #222;
+    font-size: 1.1rem;
+}
+
+.modal-close {
+    background: transparent;
+    border: none;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #666;
+}
+
+.modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.modal-field input {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    font-size: 0.95rem;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.modal-actions .ghost,
+.modal-actions .primary {
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.modal-actions .ghost {
+    background: #f2f2f2;
+    color: #444;
+}
+
+.modal-actions .primary {
+    background: #667eea;
+    color: #fff;
+}
+
+@keyframes pop-in {
+    from {
+        transform: translateY(6px) scale(0.98);
+        opacity: 0.7;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+.feed-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.feed-card {
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #fafafa;
+}
+
+.feed-title {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.feed-url {
+    color: #666;
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.feed-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.feed-actions button {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.feed-actions button.delete {
+    background: #dc3545;
+}
+
+.news-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.news-item {
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fff;
+}
+
+.news-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.news-title {
+    min-width: 0;
+}
+
+.news-item a {
+    color: #333;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.news-item .add-note {
+    background: linear-gradient(135deg, #667eea, #3f4fbf);
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 6px 14px rgba(102, 126, 234, 0.25);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.news-item .add-note:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(102, 126, 234, 0.3);
+    background: linear-gradient(135deg, #5a6fd6, #3544a6);
+}
+
+.add-note-icon {
+    font-weight: 700;
+}
+
+.notes-modal .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.notes-modal textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 90px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    padding: 10px 12px;
+    font-size: 0.95rem;
+}
+
+.notes-actions {
+    justify-content: flex-end;
+}
+
+.notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.note-card {
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.note-text {
+    color: #333;
+    font-size: 0.95rem;
+    white-space: pre-wrap;
+}
+
+.note-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #777;
+}
+
+.note-delete {
+    background: #dc3545;
+    color: #fff;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.news-meta {
+    margin-top: 4px;
+    color: #777;
+    font-size: 0.85rem;
+}
+
+.news-empty {
+    color: #777;
+    font-size: 0.95rem;
+}
