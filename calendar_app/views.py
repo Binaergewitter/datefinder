@@ -26,6 +26,7 @@ def calendar_view(request):
     """
     return render(request, 'calendar_app/calendar.html', {
         'user': request.user,
+        'active_nav': 'calendar',
     })
 
 
@@ -162,6 +163,7 @@ def confirm_list_view(request):
     return render(request, 'calendar_app/confirm.html', {
         'user': request.user,
         'candidate_dates': candidate_dates,
+        'active_nav': 'confirm',
     })
 
 
@@ -386,6 +388,8 @@ def reminders_view(request):
     return render(request, 'calendar_app/reminders.html', {
         'user': request.user,
         'reminders': reminders,
+        'active_nav': 'reminders',
+        'today': date_type.today(),
     })
 
 

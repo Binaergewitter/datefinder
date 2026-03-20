@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block body %}
+<nav class="container-fluid">
+    <ul>
+        <li><strong>🎙️ Podcast Date Finder</strong></li>
+    </ul>
+    <ul>
+        <li><a href="{% url 'calendar_app:calendar' %}" {% if active_nav == 'calendar' %}aria-current="page"{% endif %}>📅 Calendar</a></li>
+        <li><a href="{% url 'calendar_app:confirm' %}" {% if active_nav == 'confirm' %}aria-current="page"{% endif %}>✅ Confirm</a></li>
+        <li><a href="{% url 'calendar_app:reminders' %}" {% if active_nav == 'reminders' %}aria-current="page"{% endif %}>📝 Reminders</a></li>
+        <li><a href="{% url 'account_logout' %}" role="button" class="outline secondary">Logout</a></li>
+    </ul>
+</nav>
+<main class="container">
+    {% block content %}{% endblock %}
+</main>
+{% endblock %}

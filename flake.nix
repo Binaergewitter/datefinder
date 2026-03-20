@@ -57,10 +57,10 @@
             cp -r datefinder $out/lib/datefinder/
             cp -r calendar_app $out/lib/datefinder/
             cp -r templates $out/lib/datefinder/
+            cp -r static $out/lib/datefinder/
             cp manage.py $out/lib/datefinder/
             
-            # Create static directory
-            mkdir -p $out/lib/datefinder/static
+            # Create staticfiles output directory
             mkdir -p $out/lib/datefinder/staticfiles
             
             # Create wrapper script for running the server

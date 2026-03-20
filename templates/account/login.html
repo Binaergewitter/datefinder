@@ -3,22 +3,18 @@
 {% block title %}Sign In - Podcast Date Finder{% endblock %}
 
 {% block content %}
-<div class="auth-header">
-    <h1>🎙️ Podcast Date Finder</h1>
-    <p class="subtitle">Sign in to coordinate your podcast recording dates</p>
-</div>
+<hgroup>
+    <h2>🎙️ Podcast Date Finder</h2>
+    <p>Sign in to coordinate your podcast recording dates</p>
+</hgroup>
 
 {% if form.errors %}
-<div class="alert alert-error">
-    Please correct the errors below.
-</div>
+<p><mark>Please correct the errors below.</mark></p>
 {% endif %}
 
 {% if messages %}
 {% for message in messages %}
-<div class="alert alert-{{ message.tags }}">
-    {{ message }}
-</div>
+<p><ins>{{ message }}</ins></p>
 {% endfor %}
 {% endif %}
 
@@ -27,63 +23,45 @@
 {% get_providers as socialaccount_providers %}
 
 {% if socialaccount_providers %}
-<div class="social-login">
-    <ul class="socialaccount_providers">
-        {% for provider in socialaccount_providers %}
-        <li>
-            <a href="{% provider_login_url provider.id %}" title="{{ provider.name }}">
-                🔐 Sign in with {{ provider.name }}
-            </a>
-        </li>
-        {% endfor %}
-    </ul>
-</div>
-
+{% for provider in socialaccount_providers %}
+<a href="{% provider_login_url provider.id %}" role="button" title="{{ provider.name }}">
+    🔐 Sign in with {{ provider.name }}
+</a>
+{% endfor %}
 {% endif %}
-{% if local_login_enabled %}
-<div class="divider">
-    <span>or sign in with local credentials</span>
-</div>
 
-<form method="post" action="{% url 'account_login' %}" class="auth-form">
+{% if local_login_enabled %}
+<hr>
+<small>or sign in with local credentials</small>
+
+<form method="post" action="{% url 'account_login' %}">
     {% csrf_token %}
     
-    <div class="form-group">
-        <label for="id_login">Username or Email</label>
-        <input type="text" name="login" id="id_login" placeholder="Enter your username or email" 
+    <label for="id_login">Username or Email
+        <input type="text" name="login" id="id_login" placeholder="Enter your username or email"
                value="{{ form.login.value|default:'' }}" required autofocus>
         {% if form.login.errors %}
-        <ul class="errorlist">
-            {% for error in form.login.errors %}
-            <li>{{ error }}</li>
-            {% endfor %}
-        </ul>
+        <small>{% for error in form.login.errors %}{{ error }} {% endfor %}</small>
         {% endif %}
-    </div>
+    </label>
     
-    <div class="form-group">
-        <label for="id_password">Password</label>
+    <label for="id_password">Password
         <input type="password" name="password" id="id_password" placeholder="Enter your password" required>
         {% if form.password.errors %}
-        <ul class="errorlist">
-            {% for error in form.password.errors %}
-            <li>{{ error }}</li>
-            {% endfor %}
-        </ul>
+        <small>{% for error in form.password.errors %}{{ error }} {% endfor %}</small>
         {% endif %}
-    </div>
+    </label>
     
     {% if redirect_field_value %}
     <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
     {% endif %}
     
-    <button type="submit" class="btn btn-primary">Sign In</button>
+    <button type="submit">Sign In</button>
 </form>
 {% endif %}
 
 {% if registration_enabled %}
-<div class="auth-links">
-    <p>Don't have an account? <a href="{% url 'account_signup' %}">Sign up</a></p>
-</div>
+<hr>
+<p style="text-align:center;">Don't have an account? <a href="{% url 'account_signup' %}">Sign up</a></p>
 {% endif %}
 {% endblock %}

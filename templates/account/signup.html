@@ -3,25 +3,19 @@
 {% block title %}Sign Up - Podcast Date Finder{% endblock %}
 
 {% block content %}
-<div class="auth-header">
-    <h1>🎙️ Podcast Date Finder</h1>
-    <p class="subtitle">Create an account to join your podcast team</p>
-</div>
+<hgroup>
+    <h2>🎙️ Podcast Date Finder</h2>
+    <p>Create an account to join your podcast team</p>
+</hgroup>
 
 {% if not registration_enabled %}
-<div class="alert alert-error">
-    Registration is currently disabled. Please contact an administrator if you need an account.
-</div>
-
-<div class="auth-links">
-    <p>Already have an account? <a href="{% url 'account_login' %}">Sign in</a></p>
-</div>
+<p><mark>Registration is currently disabled. Please contact an administrator if you need an account.</mark></p>
+<hr>
+<p style="text-align:center;">Already have an account? <a href="{% url 'account_login' %}">Sign in</a></p>
 {% else %}
 
 {% if form.errors %}
-<div class="alert alert-error">
-    Please correct the errors below.
-</div>
+<p><mark>Please correct the errors below.</mark></p>
 {% endif %}
 
 <!-- Social Login Options -->
@@ -29,85 +23,57 @@
 {% get_providers as socialaccount_providers %}
 
 {% if socialaccount_providers %}
-<div class="social-login">
-    <ul class="socialaccount_providers">
-        {% for provider in socialaccount_providers %}
-        <li>
-            <a href="{% provider_login_url provider.id %}" title="{{ provider.name }}">
-                🔐 Sign up with {{ provider.name }}
-            </a>
-        </li>
-        {% endfor %}
-    </ul>
-</div>
+{% for provider in socialaccount_providers %}
+<a href="{% provider_login_url provider.id %}" role="button" title="{{ provider.name }}">
+    🔐 Sign up with {{ provider.name }}
+</a>
+{% endfor %}
 
-<div class="divider">
-    <span>or create an account</span>
-</div>
+<hr>
+<small>or create an account</small>
 {% endif %}
 
-<form method="post" action="{% url 'account_signup' %}" class="auth-form">
+<form method="post" action="{% url 'account_signup' %}">
     {% csrf_token %}
     
-    <div class="form-group">
-        <label for="id_username">Username</label>
-        <input type="text" name="username" id="id_username" placeholder="Choose a username" 
+    <label for="id_username">Username
+        <input type="text" name="username" id="id_username" placeholder="Choose a username"
                value="{{ form.username.value|default:'' }}" required autofocus>
         {% if form.username.errors %}
-        <ul class="errorlist">
-            {% for error in form.username.errors %}
-            <li>{{ error }}</li>
-            {% endfor %}
-        </ul>
+        <small>{% for error in form.username.errors %}{{ error }} {% endfor %}</small>
         {% endif %}
-    </div>
+    </label>
     
-    <div class="form-group">
-        <label for="id_email">Email</label>
-        <input type="email" name="email" id="id_email" placeholder="Enter your email" 
+    <label for="id_email">Email
+        <input type="email" name="email" id="id_email" placeholder="Enter your email"
                value="{{ form.email.value|default:'' }}">
         {% if form.email.errors %}
-        <ul class="errorlist">
-            {% for error in form.email.errors %}
-            <li>{{ error }}</li>
-            {% endfor %}
-        </ul>
+        <small>{% for error in form.email.errors %}{{ error }} {% endfor %}</small>
         {% endif %}
-    </div>
+    </label>
     
-    <div class="form-group">
-        <label for="id_password1">Password</label>
+    <label for="id_password1">Password
         <input type="password" name="password1" id="id_password1" placeholder="Create a password" required>
         {% if form.password1.errors %}
-        <ul class="errorlist">
-            {% for error in form.password1.errors %}
-            <li>{{ error }}</li>
-            {% endfor %}
-        </ul>
+        <small>{% for error in form.password1.errors %}{{ error }} {% endfor %}</small>
         {% endif %}
-    </div>
+    </label>
     
-    <div class="form-group">
-        <label for="id_password2">Confirm Password</label>
+    <label for="id_password2">Confirm Password
         <input type="password" name="password2" id="id_password2" placeholder="Confirm your password" required>
         {% if form.password2.errors %}
-        <ul class="errorlist">
-            {% for error in form.password2.errors %}
-            <li>{{ error }}</li>
-            {% endfor %}
-        </ul>
+        <small>{% for error in form.password2.errors %}{{ error }} {% endfor %}</small>
         {% endif %}
-    </div>
+    </label>
     
     {% if redirect_field_value %}
     <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
     {% endif %}
     
-    <button type="submit" class="btn btn-primary">Sign Up</button>
+    <button type="submit">Sign Up</button>
 </form>
 
-<div class="auth-links">
-    <p>Already have an account? <a href="{% url 'account_login' %}">Sign in</a></p>
-</div>
+<hr>
+<p style="text-align:center;">Already have an account? <a href="{% url 'account_login' %}">Sign in</a></p>
 {% endif %}
 {% endblock %}

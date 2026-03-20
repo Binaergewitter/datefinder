@@ -3,19 +3,21 @@
 {% block title %}Sign Out - Podcast Date Finder{% endblock %}
 
 {% block content %}
-<div class="auth-header">
-    <h1>🎙️ Sign Out</h1>
-    <p class="subtitle">Are you sure you want to sign out?</p>
-</div>
+<hgroup>
+    <h2>🎙️ Sign Out</h2>
+    <p>Are you sure you want to sign out?</p>
+</hgroup>
 
-<form method="post" action="{% url 'account_logout' %}" class="auth-form">
+<form method="post" action="{% url 'account_logout' %}">
     {% csrf_token %}
     
     {% if redirect_field_value %}
     <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
     {% endif %}
     
-    <button type="submit" class="btn btn-primary">Sign Out</button>
-    <a href="{% url 'calendar_app:calendar' %}" class="btn btn-secondary">Cancel</a>
+    <div role="group">
+        <button type="submit">Sign Out</button>
+        <a href="{% url 'calendar_app:calendar' %}" role="button" class="secondary">Cancel</a>
+    </div>
 </form>
 {% endblock %}
