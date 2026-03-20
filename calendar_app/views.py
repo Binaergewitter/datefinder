@@ -183,9 +183,10 @@ def confirm_date(request, date):
     if target_date < date_type.today():
         return JsonResponse({'error': 'Cannot confirm past dates'}, status=400)
     
-    # Check if date has 2+ availabilities
+    # Check if date has 1+ availabilities
+    # update
     availability_count = Availability.count_available(target_date)
-    if availability_count < 2:
+    if availability_count < 1:
         return JsonResponse({'error': 'Date must have at least 2 available users'}, status=400)
     
     # Get description from request body

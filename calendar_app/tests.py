@@ -330,6 +330,24 @@ class IntegrationTest(TransactionTestCase):
         )
         self.assertEqual(response.status_code, 302)
 
+    def test_static_pico_css_served(self):
+        """
+        Test that the PicoCSS static file is served correctly.
+        """
+        response = self.client.get('/static/css/pico.min.css')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('text/css', response['Content-Type'])
+
+    def test_calendar_page_references_pico_css(self):
+        """
+        Test that the calendar page includes a link to the PicoCSS stylesheet.
+        """
+        self.client.login(username='podcasthost', password='hostpass123')
+        response = self.client.get(reverse('calendar_app:calendar'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('pico.min.css', content)
+
 
 class WebSocketTest(TransactionTestCase):
     """
