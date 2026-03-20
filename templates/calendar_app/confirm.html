@@ -57,8 +57,13 @@
             background: rgba(118, 75, 162, 0.1);
         }
         
+        .nav-links a.active {
+            background: rgba(118, 75, 162, 0.15);
+            font-weight: 600;
+        }
+        
         .logout-btn {
-            background: #764ba2;
+            background: #cce5ff;
             color: white !important;
             border: none;
             padding: 8px 16px;
@@ -313,10 +318,12 @@
 <body>
     <div class="container">
         <header>
-            <h1>🎙️ Confirm Podcast Date</h1>
+            <h1>🎙️ Podcast Date Finder</h1>
             <div class="nav-links">
-                <a href="{% url 'calendar_app:calendar' %}">← Back to Calendar</a>
-                <a href="{% url 'account_logout' %}" class="logout-btn">Logout</a>
+                <a href="{% url 'calendar_app:calendar' %}">📅 Calendar</a>
+                <a href="{% url 'calendar_app:confirm' %}" class="active">✅ Confirm</a>
+                <a href="{% url 'calendar_app:reminders' %}">📝 Reminders</a>
+                <a href="{% url 'account_logout' %}" class="logout-btn">Logout</a>-->
             </div>
         </header>
         

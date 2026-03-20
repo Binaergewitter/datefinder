@@ -13,7 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Count
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from .models import Availability, ConfirmedDate
+from .models import Availability, ConfirmedDate, Reminder
 from .hooks import run_confirm_hooks, run_unconfirm_hooks
 
 logger = logging.getLogger(__name__)
@@ -375,3 +375,145 @@ def _ical_escape(text: str) -> str:
     text = text.replace(',', '\\,')
     text = text.replace('\n', '\\n')
     return text
+
+
+@login_required
+def reminders_view(request):
+    """
+    View showing all reminders with inline create/edit/delete.
+    """
+    reminders = Reminder.objects.all().select_related('created_by')
+    return render(request, 'calendar_app/reminders.html', {
+        'user': request.user,
+        'reminders': reminders,
+    })
+
+
+@login_required
+@require_POST
+def api_create_reminder(request):
+    """
+    Create a new reminder entry.
+    """
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    title = body.get('title', '').strip()
+    date_str = body.get('date', '').strip()
+    description = body.get('description', '').strip()
+
+    if not title:
+        return JsonResponse({'error': 'Title is required'}, status=400)
+    if not date_str:
+        return JsonResponse({'error': 'Date is required'}, status=400)
+
+    try:
+        reminder_date = date_type.fromisoformat(date_str)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid date format'}, status=400)
+
+    reminder = Reminder.objects.create(
+        title=title,
+        date=reminder_date,
+        description=description,
+        created_by=request.user,
+    )
+
+    # Regenerate iCal file
+    from .ical import generate_ical_file
+    try:
+        generate_ical_file()
+    except Exception as e:
+        logger.error(f"Failed to regenerate iCal after creating reminder: {e}")
+
+    return JsonResponse({
+        'success': True,
+        'reminder': {
+            'id': reminder.pk,
+            'title': reminder.title,
+            'date': reminder.date.isoformat(),
+            'date_display': reminder.date.strftime('%A, %B %d, %Y'),
+            'description': reminder.description,
+            'created_by': reminder.created_by.get_full_name() or reminder.created_by.username if reminder.created_by else '',
+        },
+    })
+
+
+@login_required
+@require_POST
+def api_update_reminder(request, pk):
+    """
+    Update an existing reminder entry.
+    """
+    try:
+        reminder = Reminder.objects.get(pk=pk)
+    except Reminder.DoesNotExist:
+        return JsonResponse({'error': 'Reminder not found'}, status=404)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    title = body.get('title', '').strip()
+    date_str = body.get('date', '').strip()
+    description = body.get('description', '').strip()
+
+    if not title:
+        return JsonResponse({'error': 'Title is required'}, status=400)
+    if not date_str:
+        return JsonResponse({'error': 'Date is required'}, status=400)
+
+    try:
+        reminder_date = date_type.fromisoformat(date_str)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid date format'}, status=400)
+
+    reminder.title = title
+    reminder.date = reminder_date
+    reminder.description = description
+    reminder.save()
+
+    # Regenerate iCal file
+    from .ical import generate_ical_file
+    try:
+        generate_ical_file()
+    except Exception as e:
+        logger.error(f"Failed to regenerate iCal after updating reminder: {e}")
+
+    return JsonResponse({
+        'success': True,
+        'reminder': {
+            'id': reminder.pk,
+            'title': reminder.title,
+            'date': reminder.date.isoformat(),
+            'date_display': reminder.date.strftime('%A, %B %d, %Y'),
+            'description': reminder.description,
+            'created_by': reminder.created_by.get_full_name() or reminder.created_by.username if reminder.created_by else '',
+        },
+    })
+
+
+@login_required
+@require_POST
+def api_delete_reminder(request, pk):
+    """
+    Delete a reminder entry.
+    """
+    try:
+        reminder = Reminder.objects.get(pk=pk)
+    except Reminder.DoesNotExist:
+        return JsonResponse({'error': 'Reminder not found'}, status=404)
+
+    reminder.delete()
+
+    # Regenerate iCal file
+    from .ical import generate_ical_file
+    try:
+        generate_ical_file()
+    except Exception as e:
+        logger.error(f"Failed to regenerate iCal after deleting reminder: {e}")
+
+    return JsonResponse({'success': True})

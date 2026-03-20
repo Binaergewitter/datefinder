@@ -24,6 +24,30 @@ class ConfirmedDate(models.Model):
         return f"Confirmed: {self.date} - {self.description[:50]}"
 
 
+class Reminder(models.Model):
+    """
+    Long-term reminder entries that appear in the shared iCal export.
+    Any authenticated user can create, edit, or delete any reminder.
+    """
+    title = models.CharField(max_length=200)
+    date = models.DateField()
+    description = models.TextField(blank=True, default='')
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='reminders'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['date']
+
+    def __str__(self):
+        return f"Reminder: {self.date} - {self.title[:50]}"
+
+
 class Availability(models.Model):
     """
     Model to store user availability for specific dates.

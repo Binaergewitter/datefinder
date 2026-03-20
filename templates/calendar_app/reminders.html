@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reminders</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        header h1 {
+            color: #333;
+            font-size: 1.5rem;
+        }
+        
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .nav-links a {
+            color: #764ba2;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(118, 75, 162, 0.1);
+        }
+        
+        .nav-links a.active {
+            background: rgba(118, 75, 162, 0.15);
+            font-weight: 600;
+        }
+        
+        .logout-btn {
+            background: #cce5ff;
+            color: white !important;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        
+        .logout-btn:hover {
+            background: #5a3b7d;
+        }
+        
+        .content-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .content-container h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .description {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+        }
+        
+        /* Add form */
+        .add-form {
+            display: flex;
+            gap: 10px;
+            padding: 15px 20px;
+            background: #e8f4fd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .form-group label {
+            font-size: 0.8rem;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        .form-group.title-group {
+            flex: 2;
+            min-width: 180px;
+        }
+        
+        .form-group.date-group {
+            flex: 1;
+            min-width: 140px;
+        }
+        
+        .form-group.desc-group {
+            flex: 3;
+            min-width: 200px;
+        }
+        
+        .form-group.desc-group textarea {
+            resize: vertical;
+            min-height: 36px;
+            height: 36px;
+        }
+        
+        /* Reminder list */
+        .reminder-list {
+            list-style: none;
+        }
+        
+        .reminder-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        
+        .reminder-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .reminder-item.past {
+            opacity: 0.6;
+        }
+        
+        .reminder-info {
+            flex: 1;
+        }
+        
+        .reminder-info h3 {
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+        
+        .reminder-info .meta {
+            color: #666;
+            font-size: 0.85rem;
+        }
+        
+        .reminder-info .reminder-description {
+            margin-top: 6px;
+            color: #555;
+            font-size: 0.9rem;
+        }
+        
+        .reminder-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-add {
+            background: #28a745;
+            color: white;
+            align-self: flex-end;
+        }
+        
+        .btn-add:hover {
+            background: #218838;
+        }
+        
+        .btn-edit {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-edit:hover {
+            background: #0056b3;
+        }
+        
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-delete:hover {
+            background: #c82333;
+        }
+        
+        .btn-save {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-save:hover {
+            background: #218838;
+        }
+        
+        .btn-cancel {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-cancel:hover {
+            background: #545b62;
+        }
+        
+        /* Inline edit form */
+        .edit-form {
+            display: none;
+            flex: 1;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        
+        .edit-form.active {
+            display: flex;
+        }
+        
+        .edit-form .form-group input,
+        .edit-form .form-group textarea {
+            padding: 6px 10px;
+            font-size: 0.9rem;
+        }
+        
+        .edit-form .form-group.desc-group textarea {
+            min-height: 30px;
+            height: 30px;
+        }
+        
+        .reminder-item.editing .reminder-info {
+            display: none;
+        }
+        
+        .reminder-item.editing .reminder-actions {
+            display: none;
+        }
+        
+        .reminder-item.editing .edit-form {
+            display: flex;
+        }
+        
+        .no-reminders {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .no-reminders p {
+            margin-bottom: 15px;
+        }
+        
+        .date-badge {
+            background: #764ba2;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            margin-right: 10px;
+        }
+        
+        .export-link {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+        }
+        
+        .export-link a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        
+        .export-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ Podcast Date Finder</h1>
+            <div class="nav-links">
+                <a href="{% url 'calendar_app:calendar' %}">📅 Calendar</a>
+                <a href="{% url 'calendar_app:confirm' %}">✅ Confirm</a>
+                <a href="{% url 'calendar_app:reminders' %}" class="active">📝 Reminders</a>
+                <a href="{% url 'account_logout' %}" class="logout-btn">Logout</a>
+            </div>
+        </header>
+        
+        <div class="content-container">
+            <h2>📝 Reminders</h2>
+            <p class="description">
+                Manage long-term reminders. These entries appear in the shared iCal calendar export alongside confirmed podcast dates.
+            </p>
+            
+            <!-- Add new reminder form -->
+            <div class="add-form">
+                <div class="form-group title-group">
+                    <label for="new-title">Title</label>
+                    <input type="text" id="new-title" placeholder="e.g., Conference Talk Deadline">
+                </div>
+                <div class="form-group date-group">
+                    <label for="new-date">Date</label>
+                    <input type="date" id="new-date">
+                </div>
+                <div class="form-group desc-group">
+                    <label for="new-description">Description (optional)</label>
+                    <textarea id="new-description" placeholder="Additional details..."></textarea>
+                </div>
+                <button class="btn btn-add" onclick="createReminder()">Add</button>
+            </div>
+            
+            {% if reminders %}
+            <ul class="reminder-list" id="reminder-list">
+                {% for reminder in reminders %}
+                <li class="reminder-item {% if reminder.date < today %}past{% endif %}" data-id="{{ reminder.pk }}">
+                    <div class="reminder-info">
+                        <h3>{{ reminder.title }}</h3>
+                        <div class="meta">
+                            <span class="date-badge">{{ reminder.date|date:"l, F d, Y" }}</span>
+                            {% if reminder.created_by %}
+                            <span>Added by {{ reminder.created_by.get_full_name|default:reminder.created_by.username }}</span>
+                            {% endif %}
+                        </div>
+                        {% if reminder.description %}
+                        <div class="reminder-description">{{ reminder.description }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="reminder-actions">
+                        <button class="btn btn-edit" onclick="startEdit({{ reminder.pk }})">Edit</button>
+                        <button class="btn btn-delete" onclick="deleteReminder({{ reminder.pk }})">Delete</button>
+                    </div>
+                    <div class="edit-form">
+                        <div class="form-group title-group">
+                            <label>Title</label>
+                            <input type="text" class="edit-title" value="{{ reminder.title }}">
+                        </div>
+                        <div class="form-group date-group">
+                            <label>Date</label>
+                            <input type="date" class="edit-date" value="{{ reminder.date|date:'Y-m-d' }}">
+                        </div>
+                        <div class="form-group desc-group">
+                            <label>Description</label>
+                            <textarea class="edit-description">{{ reminder.description }}</textarea>
+                        </div>
+                        <button class="btn btn-save" onclick="saveEdit({{ reminder.pk }})">Save</button>
+                        <button class="btn btn-cancel" onclick="cancelEdit({{ reminder.pk }})">Cancel</button>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="no-reminders" id="no-reminders">
+                <p>No reminders yet. Add one above!</p>
+            </div>
+            {% endif %}
+            
+            <div class="export-link">
+                <a href="{% url 'calendar_app:export_ical' %}" target="_blank">📥 Download Calendar (iCal)</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const csrfToken = '{{ csrf_token }}';
+        
+        async function createReminder() {
+            const title = document.getElementById('new-title').value.trim();
+            const date = document.getElementById('new-date').value;
+            const description = document.getElementById('new-description').value.trim();
+            
+            if (!title) {
+                alert('Title is required');
+                return;
+            }
+            if (!date) {
+                alert('Date is required');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/calendar/api/reminders/create/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ title, date, description }),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Failed to create reminder');
+                }
+            } catch (error) {
+                console.error('Error creating reminder:', error);
+                alert('Failed to create reminder');
+            }
+        }
+        
+        function startEdit(id) {
+            const item = document.querySelector(`.reminder-item[data-id="${id}"]`);
+            item.classList.add('editing');
+        }
+        
+        function cancelEdit(id) {
+            const item = document.querySelector(`.reminder-item[data-id="${id}"]`);
+            item.classList.remove('editing');
+        }
+        
+        async function saveEdit(id) {
+            const item = document.querySelector(`.reminder-item[data-id="${id}"]`);
+            const title = item.querySelector('.edit-title').value.trim();
+            const date = item.querySelector('.edit-date').value;
+            const description = item.querySelector('.edit-description').value.trim();
+            
+            if (!title) {
+                alert('Title is required');
+                return;
+            }
+            if (!date) {
+                alert('Date is required');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/calendar/api/reminders/${id}/update/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ title, date, description }),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Failed to update reminder');
+                }
+            } catch (error) {
+                console.error('Error updating reminder:', error);
+                alert('Failed to update reminder');
+            }
+        }
+        
+        async function deleteReminder(id) {
+            if (!confirm('Are you sure you want to delete this reminder?')) return;
+            
+            try {
+                const response = await fetch(`/calendar/api/reminders/${id}/delete/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Failed to delete reminder');
+                }
+            } catch (error) {
+                console.error('Error deleting reminder:', error);
+                alert('Failed to delete reminder');
+            }
+        }
+        
+        // Allow Enter key in the add form title input to submit
+        document.getElementById('new-title').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                createReminder();
+            }
+        });
+    </script>
+</body>
+</html>

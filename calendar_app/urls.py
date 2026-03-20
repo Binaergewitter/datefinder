@@ -13,4 +13,8 @@ urlpatterns = [
     path('api/confirmed/', views.get_confirmed_dates, name='get_confirmed_dates'),
     path('api/next-podcast-number/', views.get_next_podcast_number, name='get_next_podcast_number'),
     path('export/calendar.ics', views.export_ical, name='export_ical'),
+    path('reminders/', views.reminders_view, name='reminders'),
+    path('api/reminders/create/', views.api_create_reminder, name='create_reminder'),
+    path('api/reminders/<int:pk>/update/', views.api_update_reminder, name='update_reminder'),
+    path('api/reminders/<int:pk>/delete/', views.api_delete_reminder, name='delete_reminder'),
 ]

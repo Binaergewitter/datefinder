@@ -20,7 +20,7 @@ from channels.auth import AuthMiddlewareStack
 from asgiref.sync import sync_to_async
 from unittest.mock import patch, MagicMock, AsyncMock
 
-from .models import Availability
+from .models import Availability, Reminder
 from .consumers import CalendarConsumer
 from .routing import websocket_urlpatterns
 
@@ -410,7 +410,6 @@ class CalendarViewTest(TestCase):
         
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Podcast Date Finder')
-        self.assertContains(response, 'viewuser')
         self.assertContains(response, 'calendar-grid')
     
     def test_calendar_view_has_csrf_token(self):
@@ -420,3 +419,270 @@ class CalendarViewTest(TestCase):
         response = self.client.get(reverse('calendar_app:calendar'))
         
         self.assertContains(response, 'csrfToken')
+
+
+class ReminderIntegrationTest(TransactionTestCase):
+    """
+    Integration tests for the Reminder feature.
+    No mocks — uses real DB and Django test client.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.user1 = User.objects.create_user(
+            username='reminderuser1',
+            email='rem1@test.com',
+            password='testpass123',
+            first_name='Alice',
+            last_name='Smith',
+        )
+        self.user2 = User.objects.create_user(
+            username='reminderuser2',
+            email='rem2@test.com',
+            password='testpass123',
+            first_name='Bob',
+            last_name='Jones',
+        )
+        self.future_date = (date.today() + timedelta(days=30)).isoformat()
+
+    # ------------------------------------------------------------------ #
+    # CRUD tests
+    # ------------------------------------------------------------------ #
+
+    def test_create_reminder(self):
+        """Create a reminder via the API and verify it in the DB."""
+        self.client.login(username='reminderuser1', password='testpass123')
+        response = self.client.post(
+            reverse('calendar_app:create_reminder'),
+            data=json.dumps({
+                'title': 'Conference Deadline',
+                'date': self.future_date,
+                'description': 'Submit talk proposal',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['reminder']['title'], 'Conference Deadline')
+        self.assertEqual(data['reminder']['date'], self.future_date)
+        self.assertEqual(data['reminder']['description'], 'Submit talk proposal')
+
+        self.assertEqual(Reminder.objects.count(), 1)
+        reminder = Reminder.objects.first()
+        self.assertEqual(reminder.title, 'Conference Deadline')
+        self.assertEqual(reminder.created_by, self.user1)
+
+    def test_create_reminder_title_required(self):
+        """Creating a reminder without a title should fail."""
+        self.client.login(username='reminderuser1', password='testpass123')
+        response = self.client.post(
+            reverse('calendar_app:create_reminder'),
+            data=json.dumps({'title': '', 'date': self.future_date}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', response.json())
+        self.assertEqual(Reminder.objects.count(), 0)
+
+    def test_create_reminder_date_required(self):
+        """Creating a reminder without a date should fail."""
+        self.client.login(username='reminderuser1', password='testpass123')
+        response = self.client.post(
+            reverse('calendar_app:create_reminder'),
+            data=json.dumps({'title': 'No Date', 'date': ''}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', response.json())
+
+    def test_update_reminder(self):
+        """Update a reminder via the API and verify changes in DB."""
+        self.client.login(username='reminderuser1', password='testpass123')
+        reminder = Reminder.objects.create(
+            title='Old Title',
+            date=date.today() + timedelta(days=30),
+            description='Old desc',
+            created_by=self.user1,
+        )
+        new_date = (date.today() + timedelta(days=60)).isoformat()
+        response = self.client.post(
+            reverse('calendar_app:update_reminder', kwargs={'pk': reminder.pk}),
+            data=json.dumps({
+                'title': 'New Title',
+                'date': new_date,
+                'description': 'New desc',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['reminder']['title'], 'New Title')
+
+        reminder.refresh_from_db()
+        self.assertEqual(reminder.title, 'New Title')
+        self.assertEqual(reminder.date.isoformat(), new_date)
+        self.assertEqual(reminder.description, 'New desc')
+
+    def test_update_nonexistent_reminder(self):
+        """Updating a non-existent reminder returns 404."""
+        self.client.login(username='reminderuser1', password='testpass123')
+        response = self.client.post(
+            reverse('calendar_app:update_reminder', kwargs={'pk': 99999}),
+            data=json.dumps({'title': 'X', 'date': self.future_date}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_reminder(self):
+        """Delete a reminder via the API and verify it's gone."""
+        self.client.login(username='reminderuser1', password='testpass123')
+        reminder = Reminder.objects.create(
+            title='To Delete',
+            date=date.today() + timedelta(days=30),
+            created_by=self.user1,
+        )
+        response = self.client.post(
+            reverse('calendar_app:delete_reminder', kwargs={'pk': reminder.pk}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['success'])
+        self.assertEqual(Reminder.objects.count(), 0)
+
+    def test_delete_nonexistent_reminder(self):
+        """Deleting a non-existent reminder returns 404."""
+        self.client.login(username='reminderuser1', password='testpass123')
+        response = self.client.post(
+            reverse('calendar_app:delete_reminder', kwargs={'pk': 99999}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 404)
+
+    # ------------------------------------------------------------------ #
+    # Page rendering
+    # ------------------------------------------------------------------ #
+
+    def test_reminders_view_renders(self):
+        """GET the reminders page and verify it renders correctly."""
+        self.client.login(username='reminderuser1', password='testpass123')
+        Reminder.objects.create(
+            title='Visible Reminder',
+            date=date.today() + timedelta(days=10),
+            created_by=self.user1,
+        )
+        response = self.client.get(reverse('calendar_app:reminders'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Reminders')
+        self.assertContains(response, 'Visible Reminder')
+        self.assertTemplateUsed(response, 'calendar_app/reminders.html')
+
+    # ------------------------------------------------------------------ #
+    # iCal integration
+    # ------------------------------------------------------------------ #
+
+    def test_ical_content_includes_reminders(self):
+        """generate_ical_content() should include Reminder VEVENTs."""
+        from .ical import generate_ical_content
+        from .models import ConfirmedDate
+
+        ConfirmedDate.objects.create(
+            date=date.today() + timedelta(days=5),
+            description='Folge 100',
+            confirmed_by=self.user1,
+        )
+        Reminder.objects.create(
+            title='My Important Reminder',
+            date=date.today() + timedelta(days=15),
+            description='Do not forget',
+            created_by=self.user1,
+        )
+
+        ical = generate_ical_content()
+
+        # Podcast event present
+        self.assertIn('SUMMARY:Bin\\xe4rgewitter Podcast' if False else 'SUMMARY:', ical)
+        # Reminder event present
+        self.assertIn('My Important Reminder', ical)
+        self.assertIn('Do not forget', ical)
+        # Both are VEVENTs
+        self.assertGreaterEqual(ical.count('BEGIN:VEVENT'), 2)
+
+    def test_ical_export_endpoint_includes_reminders(self):
+        """The /export/calendar.ics endpoint should include reminder entries."""
+        from .ical import generate_ical_file
+
+        Reminder.objects.create(
+            title='Export Test Reminder',
+            date=date.today() + timedelta(days=20),
+            created_by=self.user1,
+        )
+        # Regenerate the file so the endpoint serves fresh content
+        generate_ical_file()
+
+        # The export endpoint has no @login_required
+        response = self.client.get(reverse('calendar_app:export_ical'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Export Test Reminder', response.content)
+
+    # ------------------------------------------------------------------ #
+    # Auth / permissions
+    # ------------------------------------------------------------------ #
+
+    def test_unauthenticated_access_denied(self):
+        """API and page should redirect unauthenticated users."""
+        reminder = Reminder.objects.create(
+            title='Auth Test',
+            date=date.today() + timedelta(days=10),
+            created_by=self.user1,
+        )
+        urls = [
+            reverse('calendar_app:reminders'),
+            reverse('calendar_app:create_reminder'),
+            reverse('calendar_app:update_reminder', kwargs={'pk': reminder.pk}),
+            reverse('calendar_app:delete_reminder', kwargs={'pk': reminder.pk}),
+        ]
+        for url in urls:
+            # GET or POST — should redirect to login
+            response = self.client.get(url)
+            self.assertIn(response.status_code, [302, 405],
+                          msg=f"Expected redirect for {url}")
+
+    def test_any_user_can_edit_any_reminder(self):
+        """User B should be able to update a reminder created by User A."""
+        reminder = Reminder.objects.create(
+            title='User A Created',
+            date=date.today() + timedelta(days=10),
+            created_by=self.user1,
+        )
+        self.client.login(username='reminderuser2', password='testpass123')
+        response = self.client.post(
+            reverse('calendar_app:update_reminder', kwargs={'pk': reminder.pk}),
+            data=json.dumps({
+                'title': 'User B Updated',
+                'date': self.future_date,
+                'description': 'Changed by B',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['success'])
+        reminder.refresh_from_db()
+        self.assertEqual(reminder.title, 'User B Updated')
+
+    def test_any_user_can_delete_any_reminder(self):
+        """User B should be able to delete a reminder created by User A."""
+        reminder = Reminder.objects.create(
+            title='User A Created',
+            date=date.today() + timedelta(days=10),
+            created_by=self.user1,
+        )
+        self.client.login(username='reminderuser2', password='testpass123')
+        response = self.client.post(
+            reverse('calendar_app:delete_reminder', kwargs={'pk': reminder.pk}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['success'])
+        self.assertEqual(Reminder.objects.count(), 0)

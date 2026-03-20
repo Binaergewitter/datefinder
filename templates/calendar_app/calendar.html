@@ -49,8 +49,31 @@
             color: #666;
         }
         
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .nav-links a {
+            color: #764ba2;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(118, 75, 162, 0.1);
+        }
+        
+        .nav-links a.active {
+            background: rgba(118, 75, 162, 0.15);
+            font-weight: 600;
+        }
+        
         .logout-btn {
-            background: #764ba2;
+            background: #cce5ff;
             color: white;
             border: none;
             padding: 8px 16px;
@@ -438,8 +461,10 @@
     <div class="container">
         <header>
             <h1>🎙️ Podcast Date Finder</h1>
-            <div class="user-info">
-                <span>Welcome, <strong>{{ user.get_full_name|default:user.username }}</strong></span>
+            <div class="nav-links">
+                <a href="{% url 'calendar_app:calendar' %}" class="active">📅 Calendar</a>
+                <a href="{% url 'calendar_app:confirm' %}">✅ Confirm</a>
+                <a href="{% url 'calendar_app:reminders' %}">📝 Reminders</a>
                 <a href="{% url 'account_logout' %}" class="logout-btn">Logout</a>
             </div>
         </header>
