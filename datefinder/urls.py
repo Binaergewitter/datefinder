@@ -3,7 +3,7 @@ URL configuration for datefinder project.
 """
 
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import include, path
 from django.views.generic import RedirectView
 
 urlpatterns = [

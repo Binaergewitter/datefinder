@@ -1,5 +1,5 @@
-from django.db import models
 from django.contrib.auth.models import User
+from django.db import models
 
 
 class ConfirmedDate(models.Model):
@@ -9,9 +9,9 @@ class ConfirmedDate(models.Model):
     date = models.DateField(unique=True)
     description = models.TextField(blank=True, default='')
     confirmed_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
         related_name='confirmed_dates'
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -56,21 +56,21 @@ class Availability(models.Model):
         ('available', 'Available'),
         ('tentative', 'Tentatively Available'),
     ]
-    
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='availabilities')
     date = models.DateField()
     status = models.CharField(max_length=20, choices=AVAILABILITY_CHOICES)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         verbose_name_plural = 'Availabilities'
         unique_together = ['user', 'date']
         ordering = ['date']
-    
+
     def __str__(self):
         return f"{self.user.username} - {self.date} - {self.status}"
-    
+
     @classmethod
     def get_date_availability(cls, date):
         """
@@ -86,14 +86,14 @@ class Availability(models.Model):
             }
             for entry in entries
         ]
-    
+
     @classmethod
     def count_available(cls, date):
         """
         Count users available (including tentatively) for a date.
         """
         return cls.objects.filter(date=date).count()
-    
+
     @classmethod
     def toggle_availability(cls, user, date):
         """

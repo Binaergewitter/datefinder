@@ -1,20 +1,21 @@
 import json
 import logging
-import urllib.request
 import urllib.error
-from datetime import date as date_type, datetime, timedelta
-import uuid
-from django.conf import settings
-from django.shortcuts import render
-from django.http import JsonResponse, HttpResponse
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST, require_GET
-from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Count
-from channels.layers import get_channel_layer
+import urllib.request
+from datetime import date as date_type
+from datetime import timedelta
+
 from asgiref.sync import async_to_sync
-from .models import Availability, ConfirmedDate, Reminder
+from channels.layers import get_channel_layer
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.db.models import Count
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render
+from django.views.decorators.http import require_GET, require_POST
+
 from .hooks import run_confirm_hooks, run_unconfirm_hooks
+from .models import Availability, ConfirmedDate, Reminder
 
 logger = logging.getLogger(__name__)
 
@@ -41,18 +42,18 @@ def toggle_availability(request, date):
         target_date = date_type.fromisoformat(date_str)
     except ValueError:
         return JsonResponse({'error': 'Invalid date format'}, status=400)
-    
+
     # Only allow toggling future dates
     if target_date < date_type.today():
         return JsonResponse({'error': 'Cannot modify past dates'}, status=400)
-    
+
     # Toggle availability
     new_status = Availability.toggle_availability(request.user, target_date)
-    
+
     # Get updated availability for this date
     date_availability = Availability.get_date_availability(target_date)
     available_count = len(date_availability)
-    
+
     # Broadcast update to all connected clients via WebSocket
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
@@ -64,7 +65,7 @@ def toggle_availability(request, date):
             "has_star": available_count >= 3,
         }
     )
-    
+
     return JsonResponse({
         'success': True,
         'date': date_str,
@@ -83,12 +84,12 @@ def get_all_availability(request):
     today = date_type.today()
     # Get availability for the next 90 days
     end_date = today + timedelta(days=90)
-    
+
     availabilities = Availability.objects.filter(
         date__gte=today,
         date__lte=end_date
     ).select_related('user')
-    
+
     # Group by date
     by_date = {}
     for entry in availabilities:
@@ -100,7 +101,7 @@ def get_all_availability(request):
             'username': entry.user.get_full_name() or entry.user.username,
             'status': entry.status,
         })
-    
+
     # Add star info
     result = {}
     for date_str, entries in by_date.items():
@@ -108,7 +109,7 @@ def get_all_availability(request):
             'availability': entries,
             'has_star': len(entries) >= 3,
         }
-    
+
     return JsonResponse({
         'success': True,
         'current_user_id': request.user.id,
@@ -122,7 +123,7 @@ def confirm_list_view(request):
     View showing future dates with 2+ availabilities for confirmation.
     """
     today = date_type.today()
-    
+
     # Get dates with 2+ availabilities
     dates_with_availability = (
         Availability.objects.filter(date__gte=today)
@@ -131,13 +132,13 @@ def confirm_list_view(request):
         .filter(count__gte=1) # at least one confirmation
         .order_by('date')
     )
-    
+
     # Get confirmed dates
     confirmed_dates = set(
         ConfirmedDate.objects.filter(date__gte=today)
         .values_list('date', flat=True)
     )
-    
+
     # Build result with availability details
     candidate_dates = []
     for item in dates_with_availability:
@@ -159,7 +160,7 @@ def confirm_list_view(request):
             'is_confirmed': is_confirmed,
             'confirmed_info': confirmed_info,
         })
-    
+
     return render(request, 'calendar_app/confirm.html', {
         'user': request.user,
         'candidate_dates': candidate_dates,
@@ -178,24 +179,24 @@ def confirm_date(request, date):
         target_date = date_type.fromisoformat(date_str)
     except ValueError:
         return JsonResponse({'error': 'Invalid date format'}, status=400)
-    
+
     # Only allow confirming future dates
     if target_date < date_type.today():
         return JsonResponse({'error': 'Cannot confirm past dates'}, status=400)
-    
+
     # Check if date has 1+ availabilities
     # update
     availability_count = Availability.count_available(target_date)
     if availability_count < 1:
-        return JsonResponse({'error': 'Date must have at least 2 available users'}, status=400)
-    
+        return JsonResponse({'error': 'Date must have at least 1 available users'}, status=400)
+
     # Get description from request body
     try:
         body = json.loads(request.body)
         description = body.get('description', '')
     except json.JSONDecodeError:
         description = ''
-    
+
     # Create or update confirmed date
     confirmed, created = ConfirmedDate.objects.update_or_create(
         date=target_date,
@@ -204,9 +205,9 @@ def confirm_date(request, date):
             'confirmed_by': request.user,
         }
     )
-    
+
     logger.debug(f"Date {'created' if created else 'updated'} in database: {target_date}")
-    
+
     # Broadcast update to all connected clients via WebSocket
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
@@ -219,14 +220,14 @@ def confirm_date(request, date):
             "confirmed_by": request.user.get_full_name() or request.user.username,
         }
     )
-    
+
     logger.debug(f"WebSocket broadcast sent for date: {date_str}")
-    
+
     # Run post-action hooks
     logger.info(f"Running confirm hooks for date {target_date} with description: {description}")
     run_confirm_hooks(target_date, description, request.user)
     logger.debug(f"Confirm hooks completed for date: {target_date}")
-    
+
     return JsonResponse({
         'success': True,
         'date': date_str,
@@ -246,10 +247,10 @@ def unconfirm_date(request, date):
         target_date = date_type.fromisoformat(date_str)
     except ValueError:
         return JsonResponse({'error': 'Invalid date format'}, status=400)
-    
+
     # Delete confirmed date if exists
     deleted, _ = ConfirmedDate.objects.filter(date=target_date).delete()
-    
+
     if deleted:
         # Broadcast update to all connected clients via WebSocket
         channel_layer = get_channel_layer()
@@ -263,10 +264,10 @@ def unconfirm_date(request, date):
                 "confirmed_by": "",
             }
         )
-        
+
         # Run post-action hooks
         run_unconfirm_hooks(target_date)
-    
+
     return JsonResponse({
         'success': True,
         'date': date_str,
@@ -282,7 +283,7 @@ def get_confirmed_dates(request):
     """
     today = date_type.today()
     confirmed = ConfirmedDate.objects.filter(date__gte=today).select_related('confirmed_by')
-    
+
     result = {}
     for entry in confirmed:
         result[entry.date.isoformat()] = {
@@ -290,7 +291,7 @@ def get_confirmed_dates(request):
             'confirmed_by': entry.confirmed_by.get_full_name() or entry.confirmed_by.username if entry.confirmed_by else 'Unknown',
             'created_at': entry.created_at.isoformat(),
         }
-    
+
     return JsonResponse({
         'success': True,
         'data': result,
@@ -346,9 +347,9 @@ def export_ical(request):
     The file is pre-generated and written to disk on startup and when dates change.
     """
     from pathlib import Path
-    
+
     export_path = Path(getattr(settings, 'ICAL_EXPORT_PATH', 'calendar.ics'))
-    
+
     if not export_path.exists():
         # Generate the file if it doesn't exist
         from .ical import generate_ical_file
@@ -357,7 +358,7 @@ def export_ical(request):
         except Exception as e:
             logger.error(f"Failed to generate iCal file: {e}")
             return HttpResponse("Calendar not available", status=503)
-    
+
     try:
         ical_content = export_path.read_text(encoding='utf-8')
         response = HttpResponse(ical_content, content_type='text/calendar; charset=utf-8')
@@ -385,7 +386,7 @@ def reminders_view(request):
     """
     View showing all reminders with inline create/edit/delete.
     """
-    reminders = Reminder.objects.all().select_related('created_by')
+    reminders = Reminder.objects.all().select_related('created_by').order_by('date')
     return render(request, 'calendar_app/reminders.html', {
         'user': request.user,
         'reminders': reminders,

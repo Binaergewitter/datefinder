@@ -31,82 +31,35 @@
           cryptography  # Required for RS256 JWT verification
         ];
         
-        # channels-redis is not in nixpkgs, we'll make it optional
-        # For production, users can install it via pip in the environment
-        
-        # Python with all dependencies
+        # Python with all dependencies (for tests and dev shell)
         pythonWithDeps = python.withPackages (ps: pythonDeps);
         
         datefinder = pythonPackages.buildPythonApplication {
           pname = "datefinder";
           version = "0.1.0";
-          format = "other";
-          
+          pyproject = true;
+
           src = ./.;
-          
-          propagatedBuildInputs = pythonDeps;
-          
-          # No build phase needed for Django
-          dontBuild = true;
-          
-          installPhase = ''
-            mkdir -p $out/lib/datefinder
-            mkdir -p $out/bin
-            
-            # Copy all project files
-            cp -r datefinder $out/lib/datefinder/
-            cp -r calendar_app $out/lib/datefinder/
-            cp -r templates $out/lib/datefinder/
-            cp -r static $out/lib/datefinder/
-            cp manage.py $out/lib/datefinder/
-            
-            # Create staticfiles output directory
-            mkdir -p $out/lib/datefinder/staticfiles
-            
-            # Create wrapper script for running the server
-            cat > $out/bin/datefinder-server <<EOF
-#!/bin/sh
-set -e
 
-# Set up environment
-export PYTHONPATH="$out/lib/datefinder:\$PYTHONPATH"
-export DJANGO_SETTINGS_MODULE="datefinder.settings"
+          build-system = with pythonPackages; [
+            setuptools
+            wheel
+          ];
 
-# Default to current directory for writable data if not set
-export DATEFINDER_DATA_DIR="\''${DATEFINDER_DATA_DIR:-\$PWD}"
+          dependencies = pythonDeps;
 
-# Set database path to writable location (defaults to current directory)
-export DATABASE_PATH="\''${DATABASE_PATH:-\$DATEFINDER_DATA_DIR/db.sqlite3}"
+          nativeCheckInputs = [
+            pkgs.ruff
+            pkgs.ty
+          ];
 
-# Create data directory if it doesn't exist
-mkdir -p "\$DATEFINDER_DATA_DIR"
-
-cd "$out/lib/datefinder"
-
-# Run migrations and collect static files if needed
-echo "Using database: ''${DATABASE_PATH:-unset}"
-if [ "\$1" = "migrate" ]; then
-    exec ${pythonWithDeps}/bin/python manage.py migrate --database default
-elif [ "\$1" = "collectstatic" ]; then
-    exec ${pythonWithDeps}/bin/python manage.py collectstatic --noinput
-elif [ "\$1" = "createsuperuser" ]; then
-    exec ${pythonWithDeps}/bin/python manage.py createsuperuser
-elif [ "\$1" = "shell" ]; then
-    exec ${pythonWithDeps}/bin/python manage.py shell
-elif [ "\$1" = "manage" ]; then
-    shift
-    exec ${pythonWithDeps}/bin/python manage.py "\$@"
-else
-    # Default: run the development server with daphne
-    exec ${pythonWithDeps}/bin/daphne -b "\''${HOST:-0.0.0.0}" -p "\''${PORT:-8000}" datefinder.asgi:application
-fi
-EOF
-            chmod +x $out/bin/datefinder-server
-            
-            # Create a convenience symlink
-            ln -s datefinder-server $out/bin/datefinder
+          checkPhase = ''
+            runHook preCheck
+            ruff check .
+            ty check --python ${pythonWithDeps}/bin/python --extra-search-path . .
+            runHook postCheck
           '';
-          
+
           meta = with pkgs.lib; {
             description = "Podcast Date Finder - coordinate podcast recording dates";
             license = licenses.mit;
@@ -121,35 +74,30 @@ EOF
           
           # Test package - run with: nix build .#test
           test = pkgs.runCommand "datefinder-tests" {
-            buildInputs = [ (python.withPackages (ps: pythonDeps)) ];
+            buildInputs = [ pythonWithDeps ];
             src = ./.;
           } ''
             export HOME=$TMPDIR
-            
+
             # Copy source to writable directory
             cp -r $src source
             chmod -R u+w source
             cd source
-            
+
             # Create staticfiles directory to avoid warnings
             mkdir -p staticfiles
-            
-            # Debug: show directory structure
-            echo "=== Directory structure ==="
-            ls -la
-            ls -la calendar_app/
-            
+
             # Run migrations using in-memory SQLite
             python manage.py migrate --settings=datefinder.settings
-            
+
             # Run integration tests
             echo "=== Running Integration Tests ==="
             python manage.py test calendar_app.tests.IntegrationTest --settings=datefinder.settings -v 2
-            
+
             # Run all tests
             echo "=== Running All Tests ==="
             python manage.py test calendar_app --settings=datefinder.settings -v 2
-            
+
             echo "All tests passed!" > $out
           '';
         };
@@ -189,22 +137,6 @@ EOF
           '';
         };
         
-        # Add a check for running tests
-        checks.default = pkgs.runCommand "datefinder-tests" {
-          buildInputs = [ python ] ++ pythonDeps;
-        } ''
-          export HOME=$TMPDIR
-          cp -r ${./.}/* .
-          chmod -R u+w .
-          
-          # Run migrations
-          python manage.py migrate --settings=datefinder.settings
-          
-          # Run tests
-          python manage.py test calendar_app --settings=datefinder.settings -v 2
-          
-          touch $out
-        '';
       }
     );
 }

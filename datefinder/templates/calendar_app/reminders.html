@@ -52,7 +52,7 @@
     </fieldset>
     <div class="grid">
         <label for="new-title">Title
-            <input type="text" id="new-title" placeholder="e.g., Conference Talk Deadline">
+            <input type="text" id="new-title" placeholder="e.g. Prediction or supposition">
         </label>
         <label for="new-date">Date
             <input type="date" id="new-date">
@@ -98,7 +98,8 @@
                 </div>
                 <div class="form-col-wide">
                     <label>Description
-                        <input type="text" class="edit-description" value="{{ reminder.description }}">
+                        <textarea type="text" rows="1" class="edit-description" placeholder="Additional details...">{{ reminder.description }}</textarea>
+
                     </label>
                 </div>
                 <div role="group">

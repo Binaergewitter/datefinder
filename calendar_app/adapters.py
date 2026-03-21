@@ -8,7 +8,7 @@ class CustomAccountAdapter(DefaultAccountAdapter):
 
     def is_open_for_signup(self, request):
         """Return True if registration is enabled, False otherwise.
-        
+
         This only affects regular form-based signup, not social login.
         """
         return getattr(settings, 'REGISTRATION_ENABLED', False)

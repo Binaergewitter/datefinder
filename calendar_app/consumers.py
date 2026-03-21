@@ -1,4 +1,5 @@
 import json
+
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 
@@ -6,7 +7,7 @@ class CalendarConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer for real-time calendar updates.
     """
-    
+
     async def connect(self):
         """
         Called when a WebSocket connection is opened.
@@ -15,17 +16,17 @@ class CalendarConsumer(AsyncWebsocketConsumer):
         if self.scope["user"].is_anonymous:
             await self.close()
             return
-        
+
         self.room_group_name = "calendar_updates"
-        
+
         # Join the calendar updates group
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
         )
-        
+
         await self.accept()
-    
+
     async def disconnect(self, close_code):
         """
         Called when a WebSocket connection is closed.
@@ -35,7 +36,7 @@ class CalendarConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
-    
+
     async def receive(self, text_data):
         """
         Called when a message is received from the WebSocket.
@@ -43,7 +44,7 @@ class CalendarConsumer(AsyncWebsocketConsumer):
         but this method is required.
         """
         pass
-    
+
     async def availability_update(self, event):
         """
         Called when an availability update is broadcast to the group.

@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "datefinder"
+version = "0.1.0"
+description = "Podcast Date Finder - A Django app for coordinating podcast recording dates"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+dependencies = [
+    "django>=4.2",
+    "django-allauth>=0.57.0",
+    "channels>=4.0.0",
+    "daphne>=4.0.0",
+    "whitenoise>=6.6.0",
+    "python-dotenv>=1.0.0",
+    "PyJWT>=2.0.0",
+    "cryptography>=3.0.0",
+    "apprise>=1.0.0",
+    "Jinja2>=3.0.0",
+    "requests",
+    "asgiref",
+]
+
+[project.scripts]
+datefinder = "datefinder.cli:server"
+datefinder-server = "datefinder.cli:server"
+datefinder-manage = "datefinder.cli:manage"
+
+[tool.setuptools.packages.find]
+include = ["datefinder*", "calendar_app*"]
+
+[tool.setuptools.package-data]
+datefinder = ["templates/**/*", "static/**/*"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"*/migrations/*" = ["ALL"]
+
+[tool.ty.rules]
+# Django uses metaclasses that add attributes dynamically (objects, DoesNotExist, etc.)
+unresolved-attribute = "warn"
+not-subscriptable = "warn"
+invalid-method-override = "warn"

@@ -4,13 +4,15 @@ Django settings for datefinder project.
 
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+PACKAGE_DIR = Path(__file__).resolve().parent  # datefinder/ package directory
+BASE_DIR = PACKAGE_DIR.parent
 STATEDIR = Path(os.getenv("STATEDIR", "/tmp")).resolve() # there is no reliable way to use Path.cwd()
 
 
@@ -78,7 +80,7 @@ ROOT_URLCONF = 'datefinder.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [PACKAGE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -147,8 +149,8 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = STATEDIR / 'staticfiles'
+STATICFILES_DIRS = [PACKAGE_DIR / 'static']
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 WHITENOISE_USE_FINDERS = True
 
@@ -216,7 +218,7 @@ APPRISE_CONFIRM_TEMPLATE = os.getenv(
     '{{ description }}'
 )
 APPRISE_UNCONFIRM_TEMPLATE = os.getenv(
-    'APPRISE_UNCONFIRM_TEMPLATE', 
+    'APPRISE_UNCONFIRM_TEMPLATE',
     '⛈️ BGT {{ date_formatted }} wurde abgesagt'
 )
 
