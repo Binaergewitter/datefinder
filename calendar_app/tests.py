@@ -593,6 +593,50 @@ class ReminderIntegrationTest(TransactionTestCase):
         self.assertContains(response, 'Visible Reminder')
         self.assertTemplateUsed(response, 'calendar_app/reminders.html')
 
+    def test_reminders_view_splits_past_and_future(self):
+        """Past reminders are in a collapsible section; future are shown first."""
+        self.client.login(username='reminderuser1', password='testpass123')
+
+        past_reminder = Reminder.objects.create(
+            title='Past Event',
+            date=date.today() - timedelta(days=5),
+            created_by=self.user1,
+        )
+        future_soon = Reminder.objects.create(
+            title='Soon Event',
+            date=date.today() + timedelta(days=3),
+            created_by=self.user1,
+        )
+        future_later = Reminder.objects.create(
+            title='Later Event',
+            date=date.today() + timedelta(days=30),
+            created_by=self.user1,
+        )
+
+        response = self.client.get(reverse('calendar_app:reminders'))
+        self.assertEqual(response.status_code, 200)
+
+        # Context has the right split
+        ctx_future = list(response.context['future_reminders'])
+        ctx_past = list(response.context['past_reminders'])
+
+        self.assertEqual(len(ctx_future), 2)
+        self.assertEqual(len(ctx_past), 1)
+
+        # Future reminders are sorted ascending (nearest first)
+        self.assertEqual(ctx_future[0].pk, future_soon.pk)
+        self.assertEqual(ctx_future[1].pk, future_later.pk)
+
+        # Past reminder is in the past list
+        self.assertEqual(ctx_past[0].pk, past_reminder.pk)
+
+        # The rendered page shows the past section inside a <details> element
+        content = response.content.decode()
+        self.assertIn('Past Reminders', content)
+        self.assertIn('Past Event', content)
+        self.assertIn('Soon Event', content)
+        self.assertIn('Later Event', content)
+
     # ------------------------------------------------------------------ #
     # iCal integration
     # ------------------------------------------------------------------ #

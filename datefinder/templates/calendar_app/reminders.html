@@ -52,7 +52,7 @@
     </fieldset>
     <div class="grid">
         <label for="new-title">Title
-            <input type="text" id="new-title" placeholder="e.g. Prediction or supposition">
+            <input type="text" id="new-title" placeholder="z.B. Behauptung oder Vorhersage">
         </label>
         <label for="new-date">Date
             <input type="date" id="new-date">
@@ -65,10 +65,10 @@
 
     <hr>
 
-    {% if reminders %}
+    {% if future_reminders %}
     <div id="reminder-list">
-        {% for reminder in reminders %}
-        <div class="reminder-item {% if reminder.date < today %}past{% endif %}" data-id="{{ reminder.pk }}">
+        {% for reminder in future_reminders %}
+        <div class="reminder-item" data-id="{{ reminder.pk }}">
             <div class="reminder-info">
                 <h4>{{ reminder.title }}</h4>
                 <div>
@@ -98,8 +98,7 @@
                 </div>
                 <div class="form-col-wide">
                     <label>Description
-                        <textarea type="text" rows="1" class="edit-description" placeholder="Additional details...">{{ reminder.description }}</textarea>
-
+                        <textarea type="text" rows="1" class="edit-description" >{{ reminder.description }}</textarea>
                     </label>
                 </div>
                 <div role="group">
@@ -110,8 +109,56 @@
         </div>
         {% endfor %}
     </div>
-    {% else %}
+    {% elif not past_reminders %}
     <p id="no-reminders" style="text-align:center;">No reminders yet. Add one above!</p>
+    {% endif %}
+
+    {% if past_reminders %}
+    <details>
+        <summary>Past Reminders ({{ past_reminders|length }})</summary>
+        <div id="past-reminder-list">
+            {% for reminder in past_reminders %}
+            <div class="reminder-item past" data-id="{{ reminder.pk }}">
+                <div class="reminder-info">
+                    <h4>{{ reminder.title }}</h4>
+                    <div>
+                        <span class="date-badge">{{ reminder.date|date:"l, F d, Y" }}</span>
+                        {% if reminder.created_by %}
+                        <small>Added by {{ reminder.created_by.get_full_name|default:reminder.created_by.username }}</small>
+                        {% endif %}
+                    </div>
+                    {% if reminder.description %}
+                    <div class="reminder-description">{{ reminder.description }}</div>
+                    {% endif %}
+                </div>
+                <div class="reminder-actions">
+                    <button class="secondary outline" onclick="deleteReminder({{ reminder.pk }})">Delete</button>
+                </div>
+                <div class="edit-form">
+                    <div class="form-col-wide">
+                        <label>Title
+                            <input type="text" class="edit-title" value="{{ reminder.title }}">
+                        </label>
+                    </div>
+                    <div class="form-col">
+                        <label>Date
+                            <input type="date" class="edit-date" value="{{ reminder.date|date:'Y-m-d' }}">
+                        </label>
+                    </div>
+                    <div class="form-col-wide">
+                        <label>Description
+                            <textarea type="text" rows="1" class="edit-description" placeholder="Additional details...">{{ reminder.description }}</textarea>
+                        </label>
+                    </div>
+                    <div role="group">
+                        <button onclick="saveEdit({{ reminder.pk }})">Save</button>
+                        <button class="secondary" onclick="cancelEdit({{ reminder.pk }})">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
     {% endif %}
 
     <footer style="text-align:center;">

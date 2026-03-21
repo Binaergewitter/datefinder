@@ -385,13 +385,26 @@ def _ical_escape(text: str) -> str:
 def reminders_view(request):
     """
     View showing all reminders with inline create/edit/delete.
+    Future reminders are sorted ascending (next reminder first).
+    Past reminders are provided separately for a collapsible section.
     """
-    reminders = Reminder.objects.all().select_related('created_by').order_by('date')
+    today = date_type.today()
+    future_reminders = (
+        Reminder.objects.filter(date__gte=today)
+        .select_related('created_by')
+        .order_by('date')
+    )
+    past_reminders = (
+        Reminder.objects.filter(date__lt=today)
+        .select_related('created_by')
+        .order_by('-date')
+    )
     return render(request, 'calendar_app/reminders.html', {
         'user': request.user,
-        'reminders': reminders,
+        'future_reminders': future_reminders,
+        'past_reminders': past_reminders,
         'active_nav': 'reminders',
-        'today': date_type.today(),
+        'today': today,
     })
 
 
