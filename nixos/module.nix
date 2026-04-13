@@ -8,10 +8,10 @@ let
     STATEDIR = cfg.stateDir;
     HOST = cfg.host;
     PORT = toString cfg.port;
-    DEBUG = if cfg.settings.debug then "true" else "false";
+    DEBUG = lib.boolToString cfg.settings.debug;
     ALLOWED_HOSTS = lib.concatStringsSep "," cfg.settings.allowedHosts;
-    REGISTRATION_ENABLED = if cfg.settings.registrationEnabled then "true" else "false";
-    LOCAL_LOGIN_ENABLED = if cfg.settings.localLoginEnabled then "true" else "false";
+    REGISTRATION_ENABLED = lib.boolToString cfg.settings.registrationEnabled;
+    LOCAL_LOGIN_ENABLED = lib.boolToString cfg.settings.localLoginEnabled;
     ICAL_TIMEZONE = cfg.settings.icalTimezone;
   }
   // lib.optionalAttrs (cfg.settings.secretKey != null) {
@@ -21,10 +21,10 @@ let
     SITE_URL = cfg.settings.siteUrl;
   }
   // lib.optionalAttrs cfg.settings.useXForwardedHost {
-    USE_X_FORWARDED_HOST = "true";
+    USE_X_FORWARDED_HOST = lib.boolToString cfg.settings.useXForwardedHost;
   }
   // lib.optionalAttrs cfg.settings.trustProxyHeaders {
-    TRUST_PROXY_HEADERS = "true";
+    TRUST_PROXY_HEADERS = lib.boolToString cfg.settings.trustProxyHeaders;
   }
   // lib.optionalAttrs (cfg.settings.csrfTrustedOrigins != []) {
     CSRF_TRUSTED_ORIGINS = lib.concatStringsSep "," cfg.settings.csrfTrustedOrigins;
@@ -82,7 +82,7 @@ in {
     stateDir = lib.mkOption {
       type = lib.types.str;
       default = "/var/lib/datefinder";
-      description = "Directory for persistent state (database, static files, calendar export).";
+      description = "Directory for persistent state (database, static files, calendar export). Managed via systemd StateDirectory.";
     };
 
     user = lib.mkOption {
@@ -112,7 +112,8 @@ in {
         type = lib.types.nullOr lib.types.str;
         default = null;
         description = ''
-          Django secret key. Prefer using environmentFile for production deployments.
+          Django secret key. WARNING: This is stored in the world-readable Nix store.
+          Prefer using {option}`environmentFile` for production deployments.
         '';
       };
 
@@ -193,13 +194,13 @@ in {
       name = lib.mkOption {
         type = lib.types.str;
         default = "datefinder";
-        description = "Database name.";
+        description = "Database name. Used for both SQLite filename and PostgreSQL database name.";
       };
 
       user = lib.mkOption {
         type = lib.types.str;
         default = "datefinder";
-        description = "Database user (for PostgreSQL).";
+        description = "Database user for PostgreSQL authentication. Must match the system user when using unix socket auth.";
       };
 
       host = lib.mkOption {
@@ -224,7 +225,10 @@ in {
       createLocally = lib.mkOption {
         type = lib.types.bool;
         default = true;
-        description = "Automatically configure a local PostgreSQL instance.";
+        description = ''
+          Automatically configure a local PostgreSQL instance with peer authentication.
+          Only takes effect when {option}`database.type` is set to `"postgres"`.
+        '';
       };
     };
 

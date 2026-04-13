@@ -26,11 +26,23 @@ A Django web application that helps a group of friends find a common meeting dat
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.10+ (or NixOS/Nix for declarative deployment)
 - Redis (optional, for production WebSocket support)
 - Keycloak server (for OAuth2 authentication)
 
 ### Installation
+
+#### Quick Run with Nix
+
+If you have Nix installed, you can run datefinder directly without any setup:
+
+```bash
+nix run github:Binaergewitter/datefinder
+```
+
+This starts the server on `http://localhost:8000` using SQLite. For a declarative NixOS deployment, see [NixOS Deployment](#nixos-deployment) below.
+
+#### Manual Installation
 
 1. Create a virtual environment:
    ```bash
@@ -156,6 +168,15 @@ STATEDIR=/var/lib/datefinder
 # Default: <STATEDIR>/db.sqlite3
 DATABASE_PATH=/var/lib/datefinder/db.sqlite3
 
+# PostgreSQL via unix socket (used by NixOS module)
+DATABASE_URL=postgres:///datefinder
+
+# PostgreSQL via TCP
+DATABASE_URL=postgres://user:password@localhost:5432/datefinder
+
+# Unix socket directory (default: /run/postgresql)
+DATABASE_SOCKET_DIR=/run/postgresql
+
 # Path where the iCal export file will be written
 # Default: <STATEDIR>/calendar.ics
 ICAL_EXPORT_PATH=/var/lib/datefinder/calendar.ics
@@ -252,6 +273,226 @@ server {
     }
 }
 ```
+
+## NixOS Deployment
+
+The datefinder flake provides a NixOS module at `services.datefinder` for declarative deployment. It handles systemd service setup, PostgreSQL integration, database migrations, and static file serving out of the box.
+
+### Quick Start with Flake
+
+Add the flake input to your NixOS configuration:
+
+```nix
+# flake.nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    datefinder.url = "github:Binaergewitter/datefinder";
+  };
+
+  outputs = { nixpkgs, datefinder, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        datefinder.nixosModules.datefinder
+        {
+          services.datefinder = {
+            enable = true;
+            settings.allowedHosts = [ "plan.example.com" "localhost" ];
+            database = {
+              type = "postgres";
+              createLocally = true;
+            };
+            environmentFile = "/run/secrets/datefinder";
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
+### PostgreSQL Integration
+
+When `database.type = "postgres"` and `database.createLocally = true` (the default), the module automatically:
+
+- Enables and configures PostgreSQL
+- Creates the `datefinder` database and user
+- Grants database ownership to the service user
+- Uses unix socket (peer) authentication — no password needed
+- Ensures the datefinder service starts after PostgreSQL
+
+The generated `DATABASE_URL` is `postgres:///datefinder` with the socket directory set to `/run/postgresql`.
+
+### External PostgreSQL
+
+To connect to an existing PostgreSQL server, disable local creation and provide the connection details:
+
+```nix
+services.datefinder = {
+  enable = true;
+  database = {
+    type = "postgres";
+    createLocally = false;
+    host = "db.example.com";
+    port = 5432;
+    name = "datefinder";
+    user = "datefinder";
+  };
+  # Put the password in DATABASE_URL inside the environmentFile:
+  # DATABASE_URL=postgres://datefinder:secretpass@db.example.com:5432/datefinder
+  environmentFile = "/run/secrets/datefinder";
+};
+```
+
+When `host` is `null` (the default), the module uses unix socket authentication via `socketDir` instead of TCP.
+
+### Secrets Management
+
+Never put secrets directly in Nix configuration — they end up in the world-readable Nix store. Instead, use `environmentFile` to point to a file containing secrets:
+
+```bash
+# /run/secrets/datefinder (or managed by sops-nix/agenix)
+SECRET_KEY=your-random-django-secret-key
+KEYCLOAK_CLIENT_SECRET=your-keycloak-client-secret
+APPRISE_URLS=slack://tokenA/tokenB/tokenC,ntfy://topic
+```
+
+The `environmentFile` is loaded by systemd as an `EnvironmentFile`, so it uses `KEY=VALUE` format (no `export`, no quotes needed).
+
+### All Module Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enable` | bool | `false` | Enable the datefinder service |
+| `package` | package | `self.packages.*.default` | The datefinder package to use |
+| `port` | port | `8000` | Port to listen on |
+| `host` | string | `"127.0.0.1"` | Bind address for the server |
+| `stateDir` | string | `"/var/lib/datefinder"` | Directory for persistent state |
+| `user` | string | `"datefinder"` | System user to run as |
+| `group` | string | `"datefinder"` | System group to run as |
+| `environmentFile` | null or path | `null` | Path to systemd EnvironmentFile with secrets |
+| **settings** | | | |
+| `settings.secretKey` | null or string | `null` | Django secret key (prefer environmentFile) |
+| `settings.debug` | bool | `false` | Enable Django debug mode |
+| `settings.allowedHosts` | list of string | `["localhost" "127.0.0.1"]` | Django ALLOWED_HOSTS |
+| `settings.siteUrl` | null or string | `null` | External URL for reverse proxy setups |
+| `settings.useXForwardedHost` | bool | `false` | Trust X-Forwarded-Host header |
+| `settings.trustProxyHeaders` | bool | `false` | Trust X-Forwarded-Proto for HTTPS detection |
+| `settings.csrfTrustedOrigins` | list of string | `[]` | CSRF trusted origins |
+| `settings.registrationEnabled` | bool | `false` | Allow new user registration |
+| `settings.localLoginEnabled` | bool | `true` | Allow local username/password login |
+| `settings.redisUrl` | null or string | `null` | Redis URL for Django Channels |
+| `settings.icalTimezone` | string | `"Europe/Berlin"` | Timezone for iCal exports |
+| **database** | | | |
+| `database.type` | enum: sqlite, postgres | `"sqlite"` | Database backend |
+| `database.name` | string | `"datefinder"` | Database name |
+| `database.user` | string | `"datefinder"` | PostgreSQL user |
+| `database.host` | null or string | `null` | Database host (null = unix socket) |
+| `database.port` | port | `5432` | Database port for TCP connections |
+| `database.socketDir` | string | `"/run/postgresql"` | PostgreSQL unix socket directory |
+| `database.createLocally` | bool | `true` | Auto-configure local PostgreSQL |
+| **keycloak** | | | |
+| `keycloak.serverUrl` | null or string | `null` | Keycloak server URL |
+| `keycloak.realm` | null or string | `null` | Keycloak realm name |
+| `keycloak.clientId` | null or string | `null` | Keycloak OIDC client ID |
+
+### Complete NixOS Deployment Example
+
+A full example with PostgreSQL, Keycloak OIDC, reverse proxy settings, and nginx:
+
+```nix
+# flake.nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    datefinder.url = "github:Binaergewitter/datefinder";
+  };
+
+  outputs = { nixpkgs, datefinder, ... }: {
+    nixosConfigurations.podcast-server = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        datefinder.nixosModules.datefinder
+        ({ pkgs, ... }: {
+          # Datefinder service
+          services.datefinder = {
+            enable = true;
+            host = "127.0.0.1";
+            port = 8000;
+
+            settings = {
+              allowedHosts = [ "plan.binaergewitter.de" "localhost" ];
+              siteUrl = "https://plan.binaergewitter.de";
+              useXForwardedHost = true;
+              trustProxyHeaders = true;
+              csrfTrustedOrigins = [ "https://plan.binaergewitter.de" ];
+              registrationEnabled = false;
+              localLoginEnabled = false;  # Keycloak only
+              icalTimezone = "Europe/Berlin";
+            };
+
+            database = {
+              type = "postgres";
+              createLocally = true;
+            };
+
+            keycloak = {
+              serverUrl = "https://keycloak.binaergewitter.de/";
+              realm = "binaergewitter";
+              clientId = "datefinder";
+            };
+
+            # Secrets: SECRET_KEY, KEYCLOAK_CLIENT_SECRET, APPRISE_URLS
+            environmentFile = "/run/secrets/datefinder";
+          };
+
+          # nginx reverse proxy with HTTPS
+          services.nginx = {
+            enable = true;
+            recommendedProxySettings = true;
+            recommendedTlsSettings = true;
+
+            virtualHosts."plan.binaergewitter.de" = {
+              enableACME = true;
+              forceSSL = true;
+
+              locations."/" = {
+                proxyPass = "http://127.0.0.1:8000";
+                proxyWebsockets = true;
+              };
+            };
+          };
+
+          # ACME (Let's Encrypt) for TLS certificates
+          security.acme = {
+            acceptTerms = true;
+            defaults.email = "admin@binaergewitter.de";
+          };
+
+          networking.firewall.allowedTCPPorts = [ 80 443 ];
+        })
+      ];
+    };
+  };
+}
+```
+
+### Running the NixOS VM Test
+
+The flake includes a NixOS VM test that validates the full stack (PostgreSQL, migrations, HTTP endpoints, user registration):
+
+```bash
+nix build .#checks.x86_64-linux.nixos-test
+```
+
+The test verifies:
+- PostgreSQL and datefinder services start successfully
+- Web interface responds (login page, redirects)
+- Database migrations create the expected tables
+- Static files are served correctly
+- iCal export endpoint works
+- User registration and login flow completes
 
 ## Usage
 
