@@ -7,14 +7,21 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+    {
+      nixosModules.datefinder = {
+        imports = [ ./nixos/module.nix ];
+        _module.args.self = self;
+      };
+      nixosModules.default = self.nixosModules.datefinder;
+    }
+    // flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        
+
         python = pkgs.python3;
-        
+
         pythonPackages = python.pkgs;
-        
+
         # Python dependencies
         pythonDeps = with pythonPackages; [
           django
@@ -29,11 +36,12 @@
           requests
           pyjwt  # PyJWT library for JWT handling (required by django-allauth)
           cryptography  # Required for RS256 JWT verification
+          psycopg2
         ];
-        
+
         # Python with all dependencies (for tests and dev shell)
         pythonWithDeps = python.withPackages (ps: pythonDeps);
-        
+
         datefinder = pythonPackages.buildPythonApplication {
           pname = "datefinder";
           version = "0.1.0";
@@ -66,12 +74,12 @@
             platforms = platforms.linux ++ platforms.darwin;
           };
         };
-        
+
       in {
         packages = {
           default = datefinder;
           datefinder = datefinder;
-          
+
           # Test package - run with: nix build .#test
           test = pkgs.runCommand "datefinder-tests" {
             buildInputs = [ pythonWithDeps ];
@@ -101,14 +109,18 @@
             echo "All tests passed!" > $out
           '';
         };
-        
+
+        checks = {
+          nixos-test = import ./nixos/test.nix { inherit pkgs self; };
+        };
+
         apps = {
           default = {
             type = "app";
             program = "${datefinder}/bin/datefinder-server";
           };
         };
-        
+
         devShells.default = pkgs.mkShell {
           buildInputs = [
             python
@@ -120,7 +132,7 @@
           ] ++ pythonDeps ++ [
             pkgs.redis
           ];
-          
+
           shellHook = ''
             echo "Podcast Date Finder development environment"
             echo ""
@@ -136,7 +148,7 @@
             echo ""
           '';
         };
-        
+
       }
     );
 }
