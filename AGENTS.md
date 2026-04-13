@@ -11,27 +11,31 @@ This repository is your mission. Treat it with respect.
 2.  **Test-Driven Development**: Every structural change requires a new integration test case.
 3.  **Efficiency**: Work smart. Minimize tool calls.
 
-## Developer Workflow
+## Developer Workflow (Branch & PR)
 
-1.  **Plan**: Identify the task. Check `README.md` and `pyproject.toml`.
-2.  **Develop**: 
-    *   Use `nix develop` for your environment.
-    *   Keep logic modular.
-3.  **Verify**:
-    *   Run `nix build` to ensure the environment is reproducible.
-    *   Run `nix build .#test` for integration tests.
-4.  **Commit**: Use clear, concise commit messages.
+1.  **Status Check**: `git status`. Ensure clean state.
+2.  **Branching**: NO direct commits to `main`. Create `feat/` or `fix/` branches.
+3.  **Develop**: 
+    *   Use `nix develop` for environment.
+    *   Logic modular.
+4.  **Verify**:
+    *   `nix build` (reproducibility).
+    *   `nix build .#test` (integration).
+5.  **Commit & Push**:
+    *   `git commit -m "type: description"`
+    *   `git push origin <branch>`
+6.  **PR**: Create Pull Request for merge to `main`.
 
 ## 🪨 Caveman Mode (Token Savings)
 
-If efficiency is critical or requested:
-*   Terse output. Technical substance exact. 
-*   Drop articles, filler words, pleasantries.
+Active by default if efficiency requested or "caveman" in prompt.
+*   Terse. Technical substance 100%. No fluff.
+*   Drop articles, filler (just/really), pleasantries.
 *   Pattern: [thing] [action] [reason]. [next step].
-*   Example: "Fixing database. Migration failed. Running nix build."
+*   Example: "Database fix. Migration fail. Run nix build."
 
 ## Memory & Context
 
 *   Read `README.md` for project goals.
-*   Capture significant decisions in `memory/` (if enabled in workspace).
+*   Capture significant decisions in `memory/` (if enabled).
 *   Text > Brain. Write down lessons learned.
