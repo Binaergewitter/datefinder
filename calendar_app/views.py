@@ -25,10 +25,14 @@ def calendar_view(request):
     """
     Main calendar view.
     """
-    return render(request, 'calendar_app/calendar.html', {
-        'user': request.user,
-        'active_nav': 'calendar',
-    })
+    return render(
+        request,
+        "calendar_app/calendar.html",
+        {
+            "user": request.user,
+            "active_nav": "calendar",
+        },
+    )
 
 
 @login_required
@@ -41,11 +45,11 @@ def toggle_availability(request, date):
     try:
         target_date = date_type.fromisoformat(date_str)
     except ValueError:
-        return JsonResponse({'error': 'Invalid date format'}, status=400)
+        return JsonResponse({"error": "Invalid date format"}, status=400)
 
     # Only allow toggling future dates
     if target_date < date_type.today():
-        return JsonResponse({'error': 'Cannot modify past dates'}, status=400)
+        return JsonResponse({"error": "Cannot modify past dates"}, status=400)
 
     # Toggle availability
     new_status = Availability.toggle_availability(request.user, target_date)
@@ -63,16 +67,18 @@ def toggle_availability(request, date):
             "date": date_str,
             "availability": date_availability,
             "has_star": available_count >= 3,
-        }
+        },
     )
 
-    return JsonResponse({
-        'success': True,
-        'date': date_str,
-        'user_status': new_status,
-        'availability': date_availability,
-        'has_star': available_count >= 3,
-    })
+    return JsonResponse(
+        {
+            "success": True,
+            "date": date_str,
+            "user_status": new_status,
+            "availability": date_availability,
+            "has_star": available_count >= 3,
+        }
+    )
 
 
 @login_required
@@ -85,10 +91,7 @@ def get_all_availability(request):
     # Get availability for the next 90 days
     end_date = today + timedelta(days=90)
 
-    availabilities = Availability.objects.filter(
-        date__gte=today,
-        date__lte=end_date
-    ).select_related('user')
+    availabilities = Availability.objects.filter(date__gte=today, date__lte=end_date).select_related("user")
 
     # Group by date
     by_date = {}
@@ -96,25 +99,29 @@ def get_all_availability(request):
         date_str = entry.date.isoformat()
         if date_str not in by_date:
             by_date[date_str] = []
-        by_date[date_str].append({
-            'user_id': entry.user.id,
-            'username': entry.user.get_full_name() or entry.user.username,
-            'status': entry.status,
-        })
+        by_date[date_str].append(
+            {
+                "user_id": entry.user.id,
+                "username": entry.user.get_full_name() or entry.user.username,
+                "status": entry.status,
+            }
+        )
 
     # Add star info
     result = {}
     for date_str, entries in by_date.items():
         result[date_str] = {
-            'availability': entries,
-            'has_star': len(entries) >= 3,
+            "availability": entries,
+            "has_star": len(entries) >= 3,
         }
 
-    return JsonResponse({
-        'success': True,
-        'current_user_id': request.user.id,
-        'data': result,
-    })
+    return JsonResponse(
+        {
+            "success": True,
+            "current_user_id": request.user.id,
+            "data": result,
+        }
+    )
 
 
 @login_required
@@ -127,45 +134,50 @@ def confirm_list_view(request):
     # Get dates with 2+ availabilities
     dates_with_availability = (
         Availability.objects.filter(date__gte=today)
-        .values('date')
-        .annotate(count=Count('id'))
-        .filter(count__gte=1) # at least one confirmation
-        .order_by('date')
+        .values("date")
+        .annotate(count=Count("id"))
+        .filter(count__gte=1)  # at least one confirmation
+        .order_by("date")
     )
 
     # Get confirmed dates
-    confirmed_dates = set(
-        ConfirmedDate.objects.filter(date__gte=today)
-        .values_list('date', flat=True)
-    )
+    confirmed_dates = set(ConfirmedDate.objects.filter(date__gte=today).values_list("date", flat=True))
 
     # Build result with availability details
     candidate_dates = []
     for item in dates_with_availability:
-        d = item['date']
+        d = item["date"]
         availability = Availability.get_date_availability(d)
         is_confirmed = d in confirmed_dates
         confirmed_info = None
         if is_confirmed:
             confirmed_obj = ConfirmedDate.objects.get(date=d)
             confirmed_info = {
-                'description': confirmed_obj.description,
-                'confirmed_by': confirmed_obj.confirmed_by.get_full_name() or confirmed_obj.confirmed_by.username if confirmed_obj.confirmed_by else 'Unknown',
+                "description": confirmed_obj.description,
+                "confirmed_by": confirmed_obj.confirmed_by.get_full_name() or confirmed_obj.confirmed_by.username
+                if confirmed_obj.confirmed_by
+                else "Unknown",
             }
-        candidate_dates.append({
-            'date': d.isoformat(),
-            'date_display': d.strftime('%A, %B %d, %Y'),
-            'count': item['count'],
-            'availability': availability,
-            'is_confirmed': is_confirmed,
-            'confirmed_info': confirmed_info,
-        })
+        candidate_dates.append(
+            {
+                "date": d.isoformat(),
+                "date_display": d.strftime("%A, %B %d, %Y"),
+                "count": item["count"],
+                "availability": availability,
+                "is_confirmed": is_confirmed,
+                "confirmed_info": confirmed_info,
+            }
+        )
 
-    return render(request, 'calendar_app/confirm.html', {
-        'user': request.user,
-        'candidate_dates': candidate_dates,
-        'active_nav': 'confirm',
-    })
+    return render(
+        request,
+        "calendar_app/confirm.html",
+        {
+            "user": request.user,
+            "candidate_dates": candidate_dates,
+            "active_nav": "confirm",
+        },
+    )
 
 
 @login_required
@@ -178,32 +190,32 @@ def confirm_date(request, date):
     try:
         target_date = date_type.fromisoformat(date_str)
     except ValueError:
-        return JsonResponse({'error': 'Invalid date format'}, status=400)
+        return JsonResponse({"error": "Invalid date format"}, status=400)
 
     # Only allow confirming future dates
     if target_date < date_type.today():
-        return JsonResponse({'error': 'Cannot confirm past dates'}, status=400)
+        return JsonResponse({"error": "Cannot confirm past dates"}, status=400)
 
     # Check if date has 1+ availabilities
     # update
     availability_count = Availability.count_available(target_date)
     if availability_count < 1:
-        return JsonResponse({'error': 'Date must have at least 1 available users'}, status=400)
+        return JsonResponse({"error": "Date must have at least 1 available users"}, status=400)
 
     # Get description from request body
     try:
         body = json.loads(request.body)
-        description = body.get('description', '')
+        description = body.get("description", "")
     except json.JSONDecodeError:
-        description = ''
+        description = ""
 
     # Create or update confirmed date
     confirmed, created = ConfirmedDate.objects.update_or_create(
         date=target_date,
         defaults={
-            'description': description,
-            'confirmed_by': request.user,
-        }
+            "description": description,
+            "confirmed_by": request.user,
+        },
     )
 
     logger.debug(f"Date {'created' if created else 'updated'} in database: {target_date}")
@@ -218,7 +230,7 @@ def confirm_date(request, date):
             "confirmed": True,
             "description": description,
             "confirmed_by": request.user.get_full_name() or request.user.username,
-        }
+        },
     )
 
     logger.debug(f"WebSocket broadcast sent for date: {date_str}")
@@ -228,12 +240,14 @@ def confirm_date(request, date):
     run_confirm_hooks(target_date, description, request.user)
     logger.debug(f"Confirm hooks completed for date: {target_date}")
 
-    return JsonResponse({
-        'success': True,
-        'date': date_str,
-        'confirmed': True,
-        'description': description,
-    })
+    return JsonResponse(
+        {
+            "success": True,
+            "date": date_str,
+            "confirmed": True,
+            "description": description,
+        }
+    )
 
 
 @login_required
@@ -246,7 +260,7 @@ def unconfirm_date(request, date):
     try:
         target_date = date_type.fromisoformat(date_str)
     except ValueError:
-        return JsonResponse({'error': 'Invalid date format'}, status=400)
+        return JsonResponse({"error": "Invalid date format"}, status=400)
 
     # Delete confirmed date if exists
     deleted, _ = ConfirmedDate.objects.filter(date=target_date).delete()
@@ -262,17 +276,19 @@ def unconfirm_date(request, date):
                 "confirmed": False,
                 "description": "",
                 "confirmed_by": "",
-            }
+            },
         )
 
         # Run post-action hooks
         run_unconfirm_hooks(target_date)
 
-    return JsonResponse({
-        'success': True,
-        'date': date_str,
-        'confirmed': False,
-    })
+    return JsonResponse(
+        {
+            "success": True,
+            "date": date_str,
+            "confirmed": False,
+        }
+    )
 
 
 @login_required
@@ -282,20 +298,24 @@ def get_confirmed_dates(request):
     Get all confirmed dates.
     """
     today = date_type.today()
-    confirmed = ConfirmedDate.objects.filter(date__gte=today).select_related('confirmed_by')
+    confirmed = ConfirmedDate.objects.filter(date__gte=today).select_related("confirmed_by")
 
     result = {}
     for entry in confirmed:
         result[entry.date.isoformat()] = {
-            'description': entry.description,
-            'confirmed_by': entry.confirmed_by.get_full_name() or entry.confirmed_by.username if entry.confirmed_by else 'Unknown',
-            'created_at': entry.created_at.isoformat(),
+            "description": entry.description,
+            "confirmed_by": entry.confirmed_by.get_full_name() or entry.confirmed_by.username
+            if entry.confirmed_by
+            else "Unknown",
+            "created_at": entry.created_at.isoformat(),
         }
 
-    return JsonResponse({
-        'success': True,
-        'data': result,
-    })
+    return JsonResponse(
+        {
+            "success": True,
+            "data": result,
+        }
+    )
 
 
 @login_required
@@ -307,36 +327,46 @@ def get_next_podcast_number(request):
     """
     try:
         req = urllib.request.Request(
-            'https://blog.binaergewitter.de/latest-show',
-            headers={'User-Agent': 'Podcast-Date-Finder/1.0'}
+            "https://blog.binaergewitter.de/latest-show", headers={"User-Agent": "Podcast-Date-Finder/1.0"}
         )
         with urllib.request.urlopen(req, timeout=5) as response:
-            text = response.read().decode('utf-8').strip()
+            text = response.read().decode("utf-8").strip()
             current_number = int(text)
             next_number = current_number + 1
-            return JsonResponse({
-                'success': True,
-                'current_number': current_number,
-                'next_number': next_number,
-            })
+            return JsonResponse(
+                {
+                    "success": True,
+                    "current_number": current_number,
+                    "next_number": next_number,
+                }
+            )
     except urllib.error.URLError as e:
         logger.error(f"Error fetching podcast number: {e}")
-        return JsonResponse({
-            'success': False,
-            'error': 'Could not fetch podcast number from blog',
-        }, status=502)
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Could not fetch podcast number from blog",
+            },
+            status=502,
+        )
     except ValueError as e:
         logger.error(f"Error parsing podcast number: {e}")
-        return JsonResponse({
-            'success': False,
-            'error': 'Invalid podcast number format',
-        }, status=502)
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Invalid podcast number format",
+            },
+            status=502,
+        )
     except Exception as e:
         logger.error(f"Unexpected error fetching podcast number: {e}")
-        return JsonResponse({
-            'success': False,
-            'error': 'Unexpected error',
-        }, status=500)
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Unexpected error",
+            },
+            status=500,
+        )
 
 
 @require_GET
@@ -348,21 +378,15 @@ def export_ical(request):
     """
     from pathlib import Path
 
-    export_path = Path(getattr(settings, 'ICAL_EXPORT_PATH', 'calendar.ics'))
+    export_path = Path(getattr(settings, "ICAL_EXPORT_PATH", "calendar.ics"))
 
     if not export_path.exists():
-        # Generate the file if it doesn't exist
-        from .ical import generate_ical_file
-        try:
-            generate_ical_file()
-        except Exception as e:
-            logger.error(f"Failed to generate iCal file: {e}")
-            return HttpResponse("Calendar not available", status=503)
+        return HttpResponse("Calendar not yet available", status=404)
 
     try:
-        ical_content = export_path.read_text(encoding='utf-8')
-        response = HttpResponse(ical_content, content_type='text/calendar; charset=utf-8')
-        response['Content-Disposition'] = 'attachment; filename="podcast_calendar.ics"'
+        ical_content = export_path.read_text(encoding="utf-8")
+        response = HttpResponse(ical_content, content_type="text/calendar; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="podcast_calendar.ics"'
         return response
     except Exception as e:
         logger.error(f"Failed to read iCal file from {export_path}: {e}")
@@ -372,12 +396,12 @@ def export_ical(request):
 def _ical_escape(text: str) -> str:
     """Escape special characters for iCal format."""
     if not text:
-        return ''
+        return ""
     # Escape backslashes, semicolons, commas, and newlines
-    text = text.replace('\\', '\\\\')
-    text = text.replace(';', '\\;')
-    text = text.replace(',', '\\,')
-    text = text.replace('\n', '\\n')
+    text = text.replace("\\", "\\\\")
+    text = text.replace(";", "\\;")
+    text = text.replace(",", "\\,")
+    text = text.replace("\n", "\\n")
     return text
 
 
@@ -389,23 +413,19 @@ def reminders_view(request):
     Past reminders are provided separately for a collapsible section.
     """
     today = date_type.today()
-    future_reminders = (
-        Reminder.objects.filter(date__gte=today)
-        .select_related('created_by')
-        .order_by('date')
+    future_reminders = Reminder.objects.filter(date__gte=today).select_related("created_by").order_by("date")
+    past_reminders = Reminder.objects.filter(date__lt=today).select_related("created_by").order_by("-date")
+    return render(
+        request,
+        "calendar_app/reminders.html",
+        {
+            "user": request.user,
+            "future_reminders": future_reminders,
+            "past_reminders": past_reminders,
+            "active_nav": "reminders",
+            "today": today,
+        },
     )
-    past_reminders = (
-        Reminder.objects.filter(date__lt=today)
-        .select_related('created_by')
-        .order_by('-date')
-    )
-    return render(request, 'calendar_app/reminders.html', {
-        'user': request.user,
-        'future_reminders': future_reminders,
-        'past_reminders': past_reminders,
-        'active_nav': 'reminders',
-        'today': today,
-    })
 
 
 @login_required
@@ -417,21 +437,21 @@ def api_create_reminder(request):
     try:
         body = json.loads(request.body)
     except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    title = body.get('title', '').strip()
-    date_str = body.get('date', '').strip()
-    description = body.get('description', '').strip()
+    title = body.get("title", "").strip()
+    date_str = body.get("date", "").strip()
+    description = body.get("description", "").strip()
 
     if not title:
-        return JsonResponse({'error': 'Title is required'}, status=400)
+        return JsonResponse({"error": "Title is required"}, status=400)
     if not date_str:
-        return JsonResponse({'error': 'Date is required'}, status=400)
+        return JsonResponse({"error": "Date is required"}, status=400)
 
     try:
         reminder_date = date_type.fromisoformat(date_str)
     except ValueError:
-        return JsonResponse({'error': 'Invalid date format'}, status=400)
+        return JsonResponse({"error": "Invalid date format"}, status=400)
 
     reminder = Reminder.objects.create(
         title=title,
@@ -442,22 +462,27 @@ def api_create_reminder(request):
 
     # Regenerate iCal file
     from .ical import generate_ical_file
+
     try:
         generate_ical_file()
     except Exception as e:
         logger.error(f"Failed to regenerate iCal after creating reminder: {e}")
 
-    return JsonResponse({
-        'success': True,
-        'reminder': {
-            'id': reminder.pk,
-            'title': reminder.title,
-            'date': reminder.date.isoformat(),
-            'date_display': reminder.date.strftime('%A, %B %d, %Y'),
-            'description': reminder.description,
-            'created_by': reminder.created_by.get_full_name() or reminder.created_by.username if reminder.created_by else '',
-        },
-    })
+    return JsonResponse(
+        {
+            "success": True,
+            "reminder": {
+                "id": reminder.pk,
+                "title": reminder.title,
+                "date": reminder.date.isoformat(),
+                "date_display": reminder.date.strftime("%A, %B %d, %Y"),
+                "description": reminder.description,
+                "created_by": reminder.created_by.get_full_name() or reminder.created_by.username
+                if reminder.created_by
+                else "",
+            },
+        }
+    )
 
 
 @login_required
@@ -469,26 +494,26 @@ def api_update_reminder(request, pk):
     try:
         reminder = Reminder.objects.get(pk=pk)
     except Reminder.DoesNotExist:
-        return JsonResponse({'error': 'Reminder not found'}, status=404)
+        return JsonResponse({"error": "Reminder not found"}, status=404)
 
     try:
         body = json.loads(request.body)
     except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    title = body.get('title', '').strip()
-    date_str = body.get('date', '').strip()
-    description = body.get('description', '').strip()
+    title = body.get("title", "").strip()
+    date_str = body.get("date", "").strip()
+    description = body.get("description", "").strip()
 
     if not title:
-        return JsonResponse({'error': 'Title is required'}, status=400)
+        return JsonResponse({"error": "Title is required"}, status=400)
     if not date_str:
-        return JsonResponse({'error': 'Date is required'}, status=400)
+        return JsonResponse({"error": "Date is required"}, status=400)
 
     try:
         reminder_date = date_type.fromisoformat(date_str)
     except ValueError:
-        return JsonResponse({'error': 'Invalid date format'}, status=400)
+        return JsonResponse({"error": "Invalid date format"}, status=400)
 
     reminder.title = title
     reminder.date = reminder_date
@@ -497,22 +522,27 @@ def api_update_reminder(request, pk):
 
     # Regenerate iCal file
     from .ical import generate_ical_file
+
     try:
         generate_ical_file()
     except Exception as e:
         logger.error(f"Failed to regenerate iCal after updating reminder: {e}")
 
-    return JsonResponse({
-        'success': True,
-        'reminder': {
-            'id': reminder.pk,
-            'title': reminder.title,
-            'date': reminder.date.isoformat(),
-            'date_display': reminder.date.strftime('%A, %B %d, %Y'),
-            'description': reminder.description,
-            'created_by': reminder.created_by.get_full_name() or reminder.created_by.username if reminder.created_by else '',
-        },
-    })
+    return JsonResponse(
+        {
+            "success": True,
+            "reminder": {
+                "id": reminder.pk,
+                "title": reminder.title,
+                "date": reminder.date.isoformat(),
+                "date_display": reminder.date.strftime("%A, %B %d, %Y"),
+                "description": reminder.description,
+                "created_by": reminder.created_by.get_full_name() or reminder.created_by.username
+                if reminder.created_by
+                else "",
+            },
+        }
+    )
 
 
 @login_required
@@ -524,15 +554,16 @@ def api_delete_reminder(request, pk):
     try:
         reminder = Reminder.objects.get(pk=pk)
     except Reminder.DoesNotExist:
-        return JsonResponse({'error': 'Reminder not found'}, status=404)
+        return JsonResponse({"error": "Reminder not found"}, status=404)
 
     reminder.delete()
 
     # Regenerate iCal file
     from .ical import generate_ical_file
+
     try:
         generate_ical_file()
     except Exception as e:
         logger.error(f"Failed to regenerate iCal after deleting reminder: {e}")
 
-    return JsonResponse({'success': True})
+    return JsonResponse({"success": True})
