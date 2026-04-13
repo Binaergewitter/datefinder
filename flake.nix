@@ -37,6 +37,7 @@
           opentelemetry-api
           opentelemetry-sdk
           redis
+          channels-redis
         ];
 
         pythonWithDeps = python.withPackages (ps: pythonDeps);
@@ -81,6 +82,7 @@
         checks = {
           nixos-test = import ./nixos/test.nix { inherit pkgs self; };
           nixos-test-migration = import ./nixos/test-migration.nix { inherit pkgs self; };
+          nixos-test-websocket = import ./nixos/test-websocket.nix { inherit pkgs self; };
         };
 
         apps = {

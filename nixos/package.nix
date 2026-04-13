@@ -20,6 +20,7 @@ let
     opentelemetry-api
     opentelemetry-sdk
     redis
+    channels-redis
   ];
 
   pythonWithDeps = python3.withPackages (_ps: pythonDeps);
