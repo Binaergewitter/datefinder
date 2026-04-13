@@ -112,6 +112,7 @@
 
         checks = {
           nixos-test = import ./nixos/test.nix { inherit pkgs self; };
+          nixos-test-migration = import ./nixos/test-migration.nix { inherit pkgs self; };
         };
 
         apps = {
