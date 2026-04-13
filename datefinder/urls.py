@@ -10,5 +10,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('allauth.urls')),
     path('calendar/', include('calendar_app.urls')),
+    path('.health', include('health.urls')),
     path('', RedirectView.as_view(url='/calendar/', permanent=False)),
 ]

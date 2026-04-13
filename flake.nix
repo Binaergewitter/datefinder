@@ -37,6 +37,8 @@
           pyjwt  # PyJWT library for JWT handling (required by django-allauth)
           cryptography  # Required for RS256 JWT verification
           psycopg2
+          opentelemetry-api
+          opentelemetry-sdk
         ];
 
         # Python with all dependencies (for tests and dev shell)

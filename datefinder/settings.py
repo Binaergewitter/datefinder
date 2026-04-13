@@ -62,8 +62,9 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.openid_connect",
     # Channels
     "channels",
-    # Our app
+    # Our apps
     "calendar_app",
+    "health",
 ]
 
 MIDDLEWARE = [

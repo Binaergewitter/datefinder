@@ -21,6 +21,8 @@ dependencies = [
     "Jinja2>=3.0.0",
     "requests",
     "asgiref",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
 ]
 
 [project.scripts]
@@ -29,7 +31,7 @@ datefinder-server = "datefinder.cli:server"
 datefinder-manage = "datefinder.cli:manage"
 
 [tool.setuptools.packages.find]
-include = ["datefinder*", "calendar_app*"]
+include = ["datefinder*", "calendar_app*", "health*"]
 
 [tool.setuptools.package-data]
 datefinder = ["templates/**/*", "static/**/*"]
