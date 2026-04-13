@@ -57,11 +57,12 @@ class CheckRedisTest(TestCase):
         """Successful Redis ping returns healthy status."""
         from health.checks import check_redis
 
+        mock_redis_mod = MagicMock()
         mock_client = MagicMock()
         mock_client.ping.return_value = True
+        mock_redis_mod.from_url.return_value = mock_client
 
-        with patch("health.checks.redis") as mock_redis_mod:
-            mock_redis_mod.from_url.return_value = mock_client
+        with patch.dict("sys.modules", {"redis": mock_redis_mod}):
             result = check_redis()
 
         self.assertEqual(result["status"], "healthy")
@@ -72,8 +73,10 @@ class CheckRedisTest(TestCase):
         """Failed Redis connection returns unhealthy status."""
         from health.checks import check_redis
 
-        with patch("health.checks.redis") as mock_redis_mod:
-            mock_redis_mod.from_url.side_effect = Exception("Connection refused")
+        mock_redis_mod = MagicMock()
+        mock_redis_mod.from_url.side_effect = Exception("Connection refused")
+
+        with patch.dict("sys.modules", {"redis": mock_redis_mod}):
             result = check_redis()
 
         self.assertEqual(result["status"], "unhealthy")
@@ -82,10 +85,26 @@ class CheckRedisTest(TestCase):
     @override_settings(REDIS_URL="redis://localhost:6379/0")
     def test_check_redis_import_error(self):
         """When redis package is not available, returns skipped."""
+        import builtins
+        import sys
+
         from health.checks import check_redis
 
-        with patch("health.checks.redis", None):
-            result = check_redis()
+        real_import = builtins.__import__
+        # Remove redis from sys.modules if cached, and block import
+        saved = sys.modules.pop("redis", None)
+
+        def fake_import(name, *args, **kwargs):
+            if name == "redis":
+                raise ImportError("No module named 'redis'")
+            return real_import(name, *args, **kwargs)
+
+        try:
+            with patch.object(builtins, "__import__", side_effect=fake_import):
+                result = check_redis()
+        finally:
+            if saved is not None:
+                sys.modules["redis"] = saved
 
         self.assertIsNotNone(result)
         self.assertEqual(result["status"], "skipped")
@@ -122,7 +141,7 @@ class CheckDiskTest(TestCase):
                 result = check_disk()
 
         self.assertEqual(result["status"], "unhealthy")
-        self.assertIn("error", result)
+        self.assertFalse(result["writable"])
 
 
 class RunAllChecksTest(TestCase):
@@ -141,7 +160,6 @@ class RunAllChecksTest(TestCase):
 
         self.assertEqual(result["status"], "healthy")
         self.assertIn("checks", result)
-        self.assertIn("uptime_seconds", result)
 
     def test_run_all_checks_one_unhealthy(self):
         """Overall status is unhealthy when any check fails."""

@@ -106,7 +106,7 @@
 
             # Run all tests
             echo "=== Running All Tests ==="
-            python manage.py test calendar_app --settings=datefinder.settings -v 2
+            python manage.py test calendar_app health --settings=datefinder.settings -v 2
 
             echo "All tests passed!" > $out
           '';
