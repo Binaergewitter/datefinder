@@ -397,6 +397,28 @@ The `environmentFile` is loaded by systemd as an `EnvironmentFile`, so it uses `
 | `keycloak.realm` | null or string | `null` | Keycloak realm name |
 | `keycloak.clientId` | null or string | `null` | Keycloak OIDC client ID |
 
+### Redis for WebSocket Support
+
+For real-time updates across multiple browser sessions, configure a local Redis instance as the Django Channels backend:
+
+```nix
+services.redis.servers.datefinder = {
+  enable = true;
+  port = 6379;
+};
+
+services.datefinder = {
+  enable = true;
+  settings.redisUrl = "redis://localhost:6379";
+  database = {
+    type = "postgres";
+    createLocally = true;
+  };
+};
+```
+
+Without Redis, datefinder uses an in-memory channel layer that only works within a single server process — WebSocket updates won't propagate between browser tabs or users. The health endpoint at `/.health` includes a `redis` check when `redisUrl` is configured.
+
 ### Complete NixOS Deployment Example
 
 A full example with PostgreSQL, Keycloak OIDC, reverse proxy settings, and nginx:
@@ -480,18 +502,19 @@ A full example with PostgreSQL, Keycloak OIDC, reverse proxy settings, and nginx
 
 ### Running the NixOS VM Test
 
-The flake includes a NixOS VM test that validates the full stack (PostgreSQL, migrations, HTTP endpoints, user registration):
+The flake includes a NixOS VM test that validates the full stack (PostgreSQL, Redis, migrations, HTTP endpoints, user registration):
 
 ```bash
 nix build .#checks.x86_64-linux.nixos-test
 ```
 
 The test verifies:
-- PostgreSQL and datefinder services start successfully
+- PostgreSQL, Redis, and datefinder services start successfully
 - Web interface responds (login page, redirects)
 - Database migrations create the expected tables
 - Static files are served correctly
 - iCal export endpoint works
+- Health endpoint returns healthy status with database and Redis checks
 - User registration and login flow completes
 
 ### Migrating from SQLite to PostgreSQL

@@ -6,6 +6,11 @@ pkgs.testers.nixosTest {
   nodes.machine = { ... }: {
     imports = [ self.nixosModules.datefinder ];
 
+    services.redis.servers.datefinder = {
+      enable = true;
+      port = 6379;
+    };
+
     services.datefinder = {
       enable = true;
       host = "0.0.0.0";
@@ -14,6 +19,7 @@ pkgs.testers.nixosTest {
         registrationEnabled = true;
         localLoginEnabled = true;
         allowedHosts = [ "localhost" "machine" ];
+        redisUrl = "redis://localhost:6379";
       };
       database = {
         type = "postgres";
@@ -23,8 +29,10 @@ pkgs.testers.nixosTest {
   };
 
   testScript = ''
+    machine.wait_for_unit("redis-datefinder.service")
     machine.wait_for_unit("postgresql.service")
     machine.wait_for_unit("datefinder.service")
+    machine.wait_for_open_port(6379)
     machine.wait_for_open_port(8000)
 
     # Test 1: Web interface reachable
@@ -48,7 +56,28 @@ pkgs.testers.nixosTest {
     status = machine.succeed("curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/calendar/export/calendar.ics")
     assert status == "200", f"Expected 200 for iCal export, got {status}"
 
-    # Test 6: User registration and login
+    # Test 6: Health endpoint accessible without authentication
+    import json
+
+    health_response = machine.succeed("curl -s http://localhost:8000/.health")
+    health = json.loads(health_response)
+    assert health["status"] == "healthy", f"Expected healthy status, got {health['status']}: {health}"
+
+    # Verify database check is healthy
+    assert health["checks"]["database"]["status"] == "healthy", \
+      f"Database check unhealthy: {health['checks']['database']}"
+
+    # Verify redis check is present and healthy
+    assert "redis" in health["checks"], \
+      f"Redis check missing from health response: {list(health['checks'].keys())}"
+    assert health["checks"]["redis"]["status"] == "healthy", \
+      f"Redis check unhealthy: {health['checks']['redis']}"
+
+    # Verify health endpoint returns proper HTTP status
+    health_status = machine.succeed("curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/.health")
+    assert health_status == "200", f"Expected 200 from /.health, got {health_status}"
+
+    # Test 7: User registration and login
     # Get CSRF token from signup page
     machine.succeed("curl -s -c /tmp/cookies.txt http://localhost:8000/accounts/signup/ > /dev/null")
     csrf = machine.succeed("grep csrftoken /tmp/cookies.txt | awk '{print $NF}'").strip()

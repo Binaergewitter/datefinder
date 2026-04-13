@@ -39,6 +39,7 @@
           psycopg2
           opentelemetry-api
           opentelemetry-sdk
+          redis
         ];
 
         # Python with all dependencies (for tests and dev shell)

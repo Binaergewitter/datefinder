@@ -14,9 +14,9 @@ def check_database() -> dict[str, Any]:
             cursor.execute("SELECT 1")
         latency = (time.monotonic() - start) * 1000
         return {"status": "healthy", "latency_ms": round(latency, 2)}
-    except Exception as e:
+    except Exception:
         latency = (time.monotonic() - start) * 1000
-        return {"status": "unhealthy", "error": str(e), "latency_ms": round(latency, 2)}
+        return {"status": "unhealthy", "latency_ms": round(latency, 2)}
 
 
 def check_redis() -> dict[str, Any] | None:
@@ -46,9 +46,9 @@ def check_redis() -> dict[str, Any] | None:
         return {"status": "healthy", "latency_ms": round(latency, 2)}
     except ImportError:
         return {"status": "skipped", "reason": "redis package not installed"}
-    except Exception as e:
+    except Exception:
         latency = (time.monotonic() - start) * 1000
-        return {"status": "unhealthy", "error": str(e), "latency_ms": round(latency, 2)}
+        return {"status": "unhealthy", "latency_ms": round(latency, 2)}
 
 
 def check_disk() -> dict[str, Any] | None:
@@ -61,7 +61,6 @@ def check_disk() -> dict[str, Any] | None:
     writable = os.access(directory, os.W_OK)
     return {
         "status": "healthy" if writable else "unhealthy",
-        "path": directory,
         "writable": writable,
     }
 

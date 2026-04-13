@@ -36,8 +36,7 @@ class CheckDatabaseTest(TestCase):
             result = check_database()
 
         self.assertEqual(result["status"], "unhealthy")
-        self.assertIn("error", result)
-        self.assertIn("connection refused", result["error"])
+        self.assertNotIn("error", result)
         self.assertIn("latency_ms", result)
 
 
@@ -65,6 +64,7 @@ class CheckRedisTest(TestCase):
         with patch.dict("sys.modules", {"redis": mock_redis_mod}):
             result = check_redis()
 
+        assert result is not None
         self.assertEqual(result["status"], "healthy")
         self.assertIn("latency_ms", result)
 
@@ -79,8 +79,9 @@ class CheckRedisTest(TestCase):
         with patch.dict("sys.modules", {"redis": mock_redis_mod}):
             result = check_redis()
 
+        assert result is not None
         self.assertEqual(result["status"], "unhealthy")
-        self.assertIn("error", result)
+        self.assertNotIn("error", result)
 
     @override_settings(REDIS_URL="redis://localhost:6379/0")
     def test_check_redis_import_error(self):
@@ -106,7 +107,7 @@ class CheckRedisTest(TestCase):
             if saved is not None:
                 sys.modules["redis"] = saved
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result["status"], "skipped")
 
 
@@ -130,6 +131,7 @@ class CheckDiskTest(TestCase):
             with self.settings(ICAL_EXPORT_PATH=export_path):
                 result = check_disk()
 
+        assert result is not None
         self.assertEqual(result["status"], "healthy")
 
     def test_check_disk_not_writable(self):
@@ -140,6 +142,7 @@ class CheckDiskTest(TestCase):
             with patch("os.access", return_value=False):
                 result = check_disk()
 
+        assert result is not None
         self.assertEqual(result["status"], "unhealthy")
         self.assertFalse(result["writable"])
 
@@ -168,7 +171,7 @@ class RunAllChecksTest(TestCase):
         with (
             patch(
                 "health.checks.check_database",
-                return_value={"status": "unhealthy", "error": "down", "latency_ms": 0.0},
+                return_value={"status": "unhealthy", "latency_ms": 0.0},
             ),
             patch("health.checks.check_redis", return_value=None),
             patch("health.checks.check_disk", return_value=None),
@@ -228,7 +231,7 @@ class HealthEndpointTest(TestCase):
     def test_health_returns_503_when_unhealthy(self):
         """Mock DB failure causes HTTP 503."""
         with patch("health.checks.check_database") as mock_db:
-            mock_db.return_value = {"status": "unhealthy", "error": "down", "latency_ms": 0.0}
+            mock_db.return_value = {"status": "unhealthy", "latency_ms": 0.0}
             response = self.client.get("/.health")
 
         self.assertEqual(response.status_code, 503)
