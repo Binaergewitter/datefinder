@@ -1,4 +1,4 @@
-{ config, lib, pkgs, self, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cfg = config.services.datefinder;
@@ -61,7 +61,7 @@ in {
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = self.packages.${pkgs.system}.default;
+      default = pkgs.callPackage ./package.nix {};
       description = "The datefinder package to use.";
     };
 

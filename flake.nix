@@ -8,10 +8,7 @@
 
   outputs = { self, nixpkgs, flake-utils }:
     {
-      nixosModules.datefinder = {
-        imports = [ ./nixos/module.nix ];
-        _module.args.self = self;
-      };
+      nixosModules.datefinder = import ./nixos/module.nix;
       nixosModules.default = self.nixosModules.datefinder;
     }
     // flake-utils.lib.eachDefaultSystem (system:
@@ -22,7 +19,7 @@
 
         pythonPackages = python.pkgs;
 
-        # Python dependencies
+        # Python dependencies (kept here for test and devShell)
         pythonDeps = with pythonPackages; [
           django
           django-allauth
@@ -34,49 +31,17 @@
           jinja2
           asgiref
           requests
-          pyjwt  # PyJWT library for JWT handling (required by django-allauth)
-          cryptography  # Required for RS256 JWT verification
+          pyjwt
+          cryptography
           psycopg2
           opentelemetry-api
           opentelemetry-sdk
           redis
         ];
 
-        # Python with all dependencies (for tests and dev shell)
         pythonWithDeps = python.withPackages (ps: pythonDeps);
 
-        datefinder = pythonPackages.buildPythonApplication {
-          pname = "datefinder";
-          version = "0.1.0";
-          pyproject = true;
-
-          src = ./.;
-
-          build-system = with pythonPackages; [
-            setuptools
-            wheel
-          ];
-
-          dependencies = pythonDeps;
-
-          nativeCheckInputs = [
-            pkgs.ruff
-            pkgs.ty
-          ];
-
-          checkPhase = ''
-            runHook preCheck
-            ruff check .
-            ty check --python ${pythonWithDeps}/bin/python --extra-search-path . .
-            runHook postCheck
-          '';
-
-          meta = with pkgs.lib; {
-            description = "Podcast Date Finder - coordinate podcast recording dates";
-            license = licenses.mit;
-            platforms = platforms.linux ++ platforms.darwin;
-          };
-        };
+        datefinder = pkgs.callPackage ./nixos/package.nix {};
 
       in {
         packages = {
