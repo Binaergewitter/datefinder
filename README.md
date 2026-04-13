@@ -494,6 +494,34 @@ The test verifies:
 - iCal export endpoint works
 - User registration and login flow completes
 
+### Migrating from SQLite to PostgreSQL
+
+If you started with the default SQLite backend and want to switch to PostgreSQL, use the included management command to transfer all data (users, availability, confirmed dates, reminders):
+
+```bash
+# Set DATABASE_URL to point to the new PostgreSQL database
+export DATABASE_URL=postgres:///datefinder
+
+# Run Django migrations on the new database first
+datefinder-manage migrate
+
+# Import data from the old SQLite file
+datefinder-manage migrate_from_sqlite --sqlite-path /var/lib/datefinder/db.sqlite3
+```
+
+The command is idempotent — re-running it skips rows that already exist in the target database. User passwords and timestamps are preserved.
+
+On NixOS, run the command as the `datefinder` user with the service environment:
+
+```bash
+sudo -u datefinder env \
+  DATABASE_URL=postgres:///datefinder \
+  DATABASE_SOCKET_DIR=/run/postgresql \
+  STATEDIR=/var/lib/datefinder \
+  SECRET_KEY=... \
+  datefinder-manage migrate_from_sqlite --sqlite-path /path/to/old/db.sqlite3
+```
+
 ## Usage
 
 1. Navigate to `http://localhost:8000`
