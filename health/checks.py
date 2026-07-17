@@ -33,7 +33,7 @@ def check_redis() -> dict[str, Any] | None:
 
     start = time.monotonic()
     try:
-        import redis as redis_lib  # ty: ignore[unresolved-import]
+        import redis as redis_lib
 
         if isinstance(redis_url, str):
             r = redis_lib.from_url(redis_url)

@@ -46,8 +46,14 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 "*/migrations/*" = ["ALL"]
 
+[tool.ty.src]
+# Do not type-check the setuptools build output copied into build/
+exclude = ["build/"]
+
 [tool.ty.rules]
-# Django uses metaclasses that add attributes dynamically (objects, DoesNotExist, etc.)
-unresolved-attribute = "warn"
-not-subscriptable = "warn"
-invalid-method-override = "warn"
+# Django uses metaclasses that add attributes dynamically (objects, DoesNotExist,
+# related-field descriptors, etc.) that ty cannot resolve statically. These are
+# false positives, so silence them rather than fail the build.
+unresolved-attribute = "ignore"
+not-subscriptable = "ignore"
+invalid-method-override = "ignore"
