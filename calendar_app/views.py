@@ -375,6 +375,9 @@ def export_ical(request):
     Serve the iCal calendar file.
     No authentication required - nginx will handle caching.
     The file is pre-generated and written to disk on startup and when dates change.
+    
+    NOTE: This endpoint is intentionally public for calendar sharing.
+    If this should be protected, add @login_required decorator.
     """
     from pathlib import Path
 
