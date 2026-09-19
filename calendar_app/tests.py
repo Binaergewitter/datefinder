@@ -1579,3 +1579,33 @@ class EntryApiTest(TestCase):
                 headers={"Authorization": self.auth},
             )
             self.assertEqual(response.status_code, 405, msg=name)
+
+
+class CliAutomigrateTest(TestCase):
+    """`datefinder-server` must not serve requests against an unmigrated SQLite DB."""
+
+    def _run(self):
+        from datefinder.cli import _automigrate_sqlite
+
+        _automigrate_sqlite()
+
+    @patch("calendar_app.ical.generate_ical_file")
+    @patch("django.core.management.call_command")
+    def test_sqlite_engine_migrates_and_regenerates_ical(self, mock_call, mock_ical):
+        self._run()
+        mock_call.assert_called_once_with("migrate", "--noinput", verbosity=0)
+        mock_ical.assert_called_once()
+
+    @patch("calendar_app.ical.generate_ical_file")
+    @patch("django.core.management.call_command")
+    def test_postgres_engine_is_left_alone(self, mock_call, mock_ical):
+        with override_settings(DATABASES={"default": {"ENGINE": "django.db.backends.postgresql", "NAME": "x"}}):
+            self._run()
+        mock_call.assert_not_called()
+        mock_ical.assert_not_called()
+
+    @patch("calendar_app.ical.generate_ical_file", side_effect=OSError("disk gone"))
+    @patch("django.core.management.call_command")
+    def test_ical_failure_never_blocks_startup(self, mock_call, mock_ical):
+        self._run()  # must not raise
+        mock_call.assert_called_once()
