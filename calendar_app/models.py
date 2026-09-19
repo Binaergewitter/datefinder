@@ -1,5 +1,12 @@
+import secrets
+import uuid
+
 from django.contrib.auth.models import User
 from django.db import models
+
+
+def _generate_reminder_uid():
+    return uuid.uuid4().hex
 
 
 class ConfirmedDate(models.Model):
@@ -32,6 +39,7 @@ class Reminder(models.Model):
     title = models.CharField(max_length=200)
     date = models.DateField()
     description = models.TextField(blank=True, default='')
+    uid = models.CharField(max_length=64, unique=True, default=_generate_reminder_uid)
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -46,6 +54,27 @@ class Reminder(models.Model):
 
     def __str__(self):
         return f"Reminder: {self.date} - {self.title[:50]}"
+
+
+class CalendarKey(models.Model):
+    """
+    Per-user CalDAV/JSON-API key, authenticates HTTP Basic as username + key.
+    Stored plaintext so the settings page can always reveal it again.
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='calendar_key')
+    key = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"CalendarKey: {self.user.username}"
+
+    @classmethod
+    def generate_for(cls, user):
+        """Create or rotate the user's CalDAV key; returns the new key string."""
+        key = secrets.token_hex(20)
+        cls.objects.update_or_create(user=user, defaults={'key': key})
+        return key
 
 
 class Availability(models.Model):

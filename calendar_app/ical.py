@@ -29,6 +29,23 @@ def _ical_escape(text: str) -> str:
     return text
 
 
+def _ical_unescape(text: str) -> str:
+    """Inverse of _ical_escape.
+
+    Naive sequential replace like the escaper: text containing a literal
+    backslash before 'n' round-trips imperfectly. Order matters: the
+    literal-backslash placeholder goes in first and is restored last.
+    """
+    if not text:
+        return ""
+    text = text.replace("\\\\", "\x00")
+    text = text.replace("\\n", "\n")
+    text = text.replace("\\,", ",")
+    text = text.replace("\\;", ";")
+    text = text.replace("\x00", "\\")
+    return text
+
+
 def generate_ical_content() -> str:
     """
     Generate iCal content from confirmed dates in the database.

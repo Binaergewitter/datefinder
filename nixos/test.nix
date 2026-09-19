@@ -96,10 +96,51 @@ pkgs.testers.nixosTest {
 
     # Log in
     login_status = machine.succeed(
-      f"curl -s -o /dev/null -w '%{{http_code}}' -b /tmp/cookies2.txt "
+      f"curl -s -o /dev/null -w '%{{http_code}}' -b /tmp/cookies2.txt -c /tmp/cookies2.txt "
       f"-d 'csrfmiddlewaretoken={csrf2}&login=testuser&password=TestPass123!' "
       f"http://localhost:8000/accounts/login/"
     )
     assert login_status in ("200", "302"), f"Login failed with status {login_status}"
+
+    # Test 8: CalDAV routes enforce Basic auth and .well-known redirects
+    dav_status = machine.succeed("curl -s -o /dev/null -w '%{http_code}' -X PROPFIND http://localhost:8000/dav/calendar/")
+    assert dav_status == "401", f"Expected 401 for unauthenticated PROPFIND, got {dav_status}"
+
+    wrong_status = machine.succeed("curl -s -u testuser:wrongkey -o /dev/null -w '%{http_code}' -X PROPFIND http://localhost:8000/dav/calendar/")
+    assert wrong_status == "401", f"Expected 401 for wrong calendar key, got {wrong_status}"
+
+    wk_status = machine.succeed("curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/.well-known/caldav")
+    assert wk_status == "301", f"Expected 301 from .well-known/caldav, got {wk_status}"
+
+    # Positive path: generate a real calendar key with the logged-in session
+    # over plain HTTP (session cookie is sent), then PROPFIND must succeed
+    # (an always-401 regression fails here) and rotation must revoke the old key.
+    import json
+
+    def generate_key():
+        csrf3 = machine.succeed("grep csrftoken /tmp/cookies2.txt | awk '{print $NF}'").strip()
+        out = machine.succeed(
+          f"curl -s -b /tmp/cookies2.txt -c /tmp/cookies2.txt "
+          f"-d 'csrfmiddlewaretoken={csrf3}' "
+          f"http://localhost:8000/calendar/api/dav-key/generate/"
+        )
+        return json.loads(out)["data"]["key"]
+
+    calendar_key = generate_key()
+    assert len(calendar_key) == 40, f"Unexpected calendar key: {calendar_key!r}"
+
+    ok_status = machine.succeed(
+      f"curl -s -u testuser:{calendar_key} -o /dev/null -w '%{{http_code}}' "
+      f"-X PROPFIND http://localhost:8000/dav/calendar/"
+    )
+    assert ok_status == "207", f"Expected 207 for PROPFIND with valid key, got {ok_status}"
+
+    rotated = generate_key()
+    assert rotated != calendar_key, "key rotation returned the same key"
+    stale_status = machine.succeed(
+      f"curl -s -u testuser:{calendar_key} -o /dev/null -w '%{{http_code}}' "
+      f"-X PROPFIND http://localhost:8000/dav/calendar/"
+    )
+    assert stale_status == "401", f"Expected 401 for rotated-out key, got {stale_status}"
   '';
 }

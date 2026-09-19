@@ -21,6 +21,8 @@ A Django web application that helps a group of friends find a common meeting dat
 - **Date Confirmation**: Confirm dates with 1+ availabilities as official podcast recording dates
 - **Notifications**: Send notifications via Apprise when dates are confirmed/unconfirmed
 - **iCal Export**: Public iCal feed for subscribing to confirmed podcast dates
+- **CalDAV Sync**: Edit reminders from Thunderbird, DAVx5 or Apple Calendar via a minimal CalDAV endpoint with per-user calendar keys
+- **JSON-API**: Add/remove/change calendar entries from scripts using HTTP Basic (username + calendar key)
 
 ## Setup
 
@@ -560,6 +562,38 @@ sudo -u datefinder env \
 8. Visit the **Confirm** page to officially confirm dates with 2+ availabilities
 9. Confirmed dates appear in blue on the calendar
 10. Subscribe to the iCal feed at `/calendar/export/calendar.ics`
+
+### CalDAV-Sync (Bearbeiten)
+
+Termineinträge (Reminders) lassen sich aus typischen CalDAV-Clients bearbeiten:
+
+1. Im Web unter **🔑 Sync** (`/calendar/sync/`) einen persönlichen **Calendar-Key** generieren (jederzeit erneut einsehbar; Regenerieren trennt bestehende Clients ab, bis dort das Passwort aktualisiert wird).
+2. Client einrichten:
+   - **Thunderbird**: Kalender → *Neuen Kalender* → *Im Netzwerk* → Typ **CalDAV** → URL `<site>/dav/calendar/` → Benutzername + Calendar-Key als Passwort.
+   - **DAVx5 / Apple Kalender**: Server-URL `<site>/dav/calendar/`, Benutzername, Calendar-Key als Passwort.
+
+CalDAV-Bearbeitungen wirken auf dieselben Reminder-Einträge wie die Reminders-Seite und regenerieren sofort das öffentliche `export/calendar.ics`. Die bestätigten Sendungstermine (`ConfirmedDate`) bleiben web-only (Bestätigungs-Flow mit Validierung + Hooks).
+
+Bekannte Einschränkungen: RRULE wird ignoriert (nur Einzelereignisse), keine Einladungen/Terminplanung (kein `calendar-auto-schedule`), Vergangenheitstermine sind über CalDAV nicht gesperrt (die Web-Beschränkung gilt nur für Verfügbarkeits-Toggles).
+
+### JSON-API
+
+Einträge hinzufügen/ändern/löschen ohne CalDAV-Client. Authentifizierung wahlweise HTTP Basic (`username:calendar-key`) oder Browser-Session (dann CSRF-Token erforderlich):
+
+| Methode | Pfad | Body | Response |
+|---------|------|------|----------|
+| GET | `/calendar/api/entries/` | – | `{"success": true, "data": [{id, uid, title, date, date_display, description, created_by}]}` |
+| POST | `/calendar/api/entries/create/` | `{"title", "date", "description"?, "uid"?}` | `{"success": true, "data": {...}}` |
+| POST | `/calendar/api/entries/<id>/update/` | beliebig: `title`?, `date`?, `description`?, `uid`? | `{"success": true, "data": {...}}` |
+| POST | `/calendar/api/entries/<id>/delete/` | – | `{"success": true}` |
+
+Fehler: `400` (`Title is required`, `Date is required`, `Invalid date format`, `UID already exists`, `Invalid UID`, `UID is required`, `Invalid JSON`), `401` (Basic/Session fehlt), `404` (`Reminder not found`). UID ist auf `[A-Za-z0-9._@+-]{1,64}` beschränkt (passt zu den von CalDAV erzeugten UUIDs).
+
+```bash
+curl -u user:key -X POST -H 'Content-Type: application/json' \
+  -d '{"title":"Live-Aufnahme","date":"2026-10-01","description":"Studio"}' \
+  https://plan.binaergewitter.de/calendar/api/entries/create/
+```
 
 ## Project Structure
 

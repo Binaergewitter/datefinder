@@ -25,6 +25,12 @@ dependencies = [
     "opentelemetry-sdk>=1.20.0",
 ]
 
+[project.optional-dependencies]
+# Test-only dependencies (real CalDAV client integration tests)
+test = [
+  "caldav>=3.0",
+]
+
 [project.scripts]
 datefinder = "datefinder.cli:server"
 datefinder-server = "datefinder.cli:server"

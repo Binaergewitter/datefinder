@@ -38,6 +38,10 @@
           opentelemetry-sdk
           redis
           channels-redis
+          # test-only: real CalDAV client for integration tests (tests_caldav_client.py).
+          # Lives here (not in nixos/package.nix `dependencies`) so the deployed
+          # package closure stays free of it; pyproject mirrors it under [project.optional-dependencies] test.
+          caldav
         ];
 
         pythonWithDeps = python.withPackages (ps: pythonDeps);

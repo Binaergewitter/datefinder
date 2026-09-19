@@ -1,0 +1,163 @@
+{% extends "calendar_app/base.html" %}
+
+{% block title %}Sync{% endblock %}
+
+{% block extra_css %}
+.field-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+.field-row label { min-width: 110px; margin: 0; }
+.field-row input { flex: 1; margin: 0; font-family: monospace; }
+.field-row button { padding: 0.3rem 0.6rem; margin: 0; }
+details { margin-bottom: 1rem; }
+details summary { cursor: pointer; }
+pre.curl-example {
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 0.85rem;
+}
+.flash-success { color: var(--pico-color-green-600); }
+{% endblock %}
+
+{% block content %}
+<article>
+    <h2>🔑 CalDAV-Sync &amp; JSON-API</h2>
+    <p>
+        Erstelle deinen persönlichen <strong>Calendar-Key</strong> und trage ihn in
+        Thunderbird / DAVx5 / Apple Calendar als Passwort ein, oder nutze ihn
+        für das JSON-API (<code>curl -u Benutzer:KEY</code>).
+    </p>
+    <p id="flash" class="flash-success" hidden></p>
+
+    <div class="field-row">
+        <label for="dav-url">Server-URL</label>
+        <input type="text" id="dav-url" readonly value="{{ dav_url }}">
+        <button type="button" data-copy="dav-url">Kopieren</button>
+    </div>
+    <div class="field-row">
+        <label for="dav-username">Benutzer</label>
+        <input type="text" id="dav-username" readonly value="{{ user.username }}">
+        <button type="button" data-copy="dav-username">Kopieren</button>
+    </div>
+    <div class="field-row">
+        <label for="dav-key">Calendar-Key</label>
+        <input type="password" id="dav-key" readonly value="">
+        <button type="button" id="reveal-key" title="Key anzeigen">👁</button>
+        <button type="button" data-copy="dav-key">Kopieren</button>
+    </div>
+    <p id="no-key" hidden>Kein Key generiert. Erzeuge unten deinen persönlichen Schlüssel.</p>
+
+    <p>
+        <button type="button" id="generate-key">🔑 Neue Key generieren</button>
+    </p>
+    <p><small>⚠️ Regenerieren einer Key trennt alle bestehenden Thunderbird-/DAVx5-Synchronisationen ab,
+        bis dort das Passwort (die Key) aktualisiert wird.</small></p>
+
+    <details>
+        <summary>📧 Thunderbird einrichten</summary>
+        <ol>
+            <li>Kalender-Panel → <em>Neuen Kalender</em> → <em>Im Netzwerk</em></li>
+            <li>Typ: <strong>CalDAV</strong></li>
+            <li>Ort: die Server-URL oben (<code>{{ dav_url }}</code>)</li>
+            <li>Benutzername + Calendar-Key als Passwort eintragen</li>
+            <li><em>Passwort-Manager verwenden</em> kann deaktiviert bleiben</li>
+        </ol>
+    </details>
+
+    <details>
+        <summary>📱 Mobile Clients (DAVx5 / Apple Kalender)</summary>
+        <ol>
+            <li>Server-URL: <code>{{ dav_url }}</code></li>
+            <li>Benutzername: <code>{{ user.username }}</code></li>
+            <li>Passwort: dein Calendar-Key</li>
+        </ol>
+    </details>
+
+    <details>
+        <summary>🔌 JSON-API (Skripte)</summary>
+        <p>Einträge hinzufügen / ändern / löschen ohne CalDAV-Client, gleiche Daten wie die Reminders-Seite:</p>
+        <pre class="curl-example">Alle Einträge:
+curl -u {{ user.username }}:&lt;KEY&gt; {{ api_base }}/api/entries/
+
+Neuer Eintrag:
+curl -u {{ user.username }}:&lt;KEY&gt; -X POST -H 'Content-Type: application/json' \
+  -d '{"title":"Live-Aufnahme","date":"2026-10-01","description":"Studio"}' \
+  {{ api_base }}/api/entries/create/
+
+Eintrag ändern (id aus der Liste):
+curl -u {{ user.username }}:&lt;KEY&gt; -X POST -H 'Content-Type: application/json' \
+  -d '{"title":"Neuer Titel"}' \
+  {{ api_base }}/api/entries/ID/update/
+
+Eintrag löschen:
+curl -u {{ user.username }}:&lt;KEY&gt; -X POST \
+  {{ api_base }}/api/entries/ID/delete/</pre>
+    </details>
+</article>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const keyInput = document.getElementById('dav-key');
+const noKey = document.getElementById('no-key');
+const flash = document.getElementById('flash');
+const generateBtn = document.getElementById('generate-key');
+const revealBtn = document.getElementById('reveal-key');
+
+function setKey(key) {
+    if (key) {
+        keyInput.value = key;
+        noKey.hidden = true;
+        generateBtn.textContent = '🔄 Key regenerieren';
+    } else {
+        keyInput.value = '';
+        keyInput.type = 'password';
+        noKey.hidden = false;
+    }
+}
+
+function showFlash(text) {
+    flash.textContent = text;
+    flash.hidden = false;
+    setTimeout(() => { flash.hidden = true; }, 4000);
+}
+
+fetch('/calendar/api/dav-key/')
+    .then(r => r.json())
+    .then(data => { if (data.success) setKey(data.data.key); })
+    .catch(() => {});
+
+generateBtn.addEventListener('click', () => {
+    fetch('/calendar/api/dav-key/generate/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                setKey(data.data.key);
+                keyInput.type = 'text';
+                showFlash('✅ Neue Calendar-Key generiert.');
+            } else {
+                showFlash('Fehler: ' + (data.error || 'unbekannt'));
+            }
+        });
+});
+
+revealBtn.addEventListener('click', () => {
+    keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
+});
+
+document.querySelectorAll('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.copy);
+        navigator.clipboard.writeText(input.value);
+        showFlash('📋 In Zwischenablage kopiert.');
+    });
+});
+</script>
+{% endblock %}
