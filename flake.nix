@@ -59,6 +59,8 @@
             src = ./.;
           } ''
             export HOME=$TMPDIR
+            export SECRET_KEY=test-secret-key-for-nix-build
+            export ALLOWED_HOSTS=testserver,127.0.0.1,localhost
 
             # Copy source to writable directory
             cp -r $src source

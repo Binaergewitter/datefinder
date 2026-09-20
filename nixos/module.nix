@@ -103,6 +103,7 @@ in {
       description = ''
         Path to a systemd EnvironmentFile containing secrets.
         Supports SECRET_KEY, KEYCLOAK_CLIENT_SECRET, APPRISE_URLS.
+        SECRET_KEY is mandatory: provide it here or via {option}`settings.secretKey`.
       '';
       example = "/run/secrets/datefinder";
     };
@@ -257,6 +258,13 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        # settings.py raises at import without SECRET_KEY; catch misconfiguration at eval time.
+        assertion = cfg.settings.secretKey != null || cfg.environmentFile != null;
+        message = "services.datefinder: SECRET_KEY must be provided via services.datefinder.environmentFile or services.datefinder.settings.secretKey";
+      }
+    ];
     users.users.${cfg.user} = {
       isSystemUser = true;
       group = cfg.group;

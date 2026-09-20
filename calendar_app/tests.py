@@ -1609,3 +1609,80 @@ class CliAutomigrateTest(TestCase):
     def test_ical_failure_never_blocks_startup(self, mock_call, mock_ical):
         self._run()  # must not raise
         mock_call.assert_called_once()
+
+
+class SettingsHardeningTest(TestCase):
+    """Strict SECRET_KEY/ALLOWED_HOSTS contract and production security headers."""
+
+    IMPORT = "import datefinder.settings as s; print(repr((s.SECRET_KEY, s.DEBUG, s.ALLOWED_HOSTS)))"
+
+    def _import(self, code=None, argv=(), **env):
+        # extra argv after `-c` become sys.argv[1:], simulating `manage.py test` (argv[1] == "test")
+        # cwd outside the repo so load_dotenv() cannot pick up a local .env; PYTHONPATH keeps imports working.
+        import os
+        import subprocess
+        import sys
+
+        repo_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = subprocess.run(
+                [sys.executable, "-c", code or self.IMPORT, *argv],
+                env={**os.environ, "PYTHONPATH": str(repo_root), **env},
+                capture_output=True,
+                text=True,
+                cwd=tmp,
+            )
+        return proc
+
+    def test_missing_secret_key_raises_in_production(self):
+        proc = self._import(SECRET_KEY="", DEBUG="False", ALLOWED_HOSTS="example.org")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("SECRET_KEY", proc.stderr)
+
+    def test_missing_allowed_hosts_raises_in_production(self):
+        proc = self._import(SECRET_KEY="x", DEBUG="False", ALLOWED_HOSTS="")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("ALLOWED_HOSTS", proc.stderr)
+
+    def test_test_runner_gets_insecure_key_without_env(self):
+        # `manage.py test` (as run by nix build .#test) has no SECRET_KEY env but must import.
+        proc = self._import(argv=("test",), SECRET_KEY="", DEBUG="", ALLOWED_HOSTS="testserver")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("django-insecure", proc.stdout)
+
+    def test_production_settings_enable_security_headers(self):
+        # simulates the plan.binaergewitter.de deployment: DEBUG off, TRUST_PROXY_HEADERS on
+        check = """
+import datefinder.settings as s
+assert s.SECURE_HSTS_SECONDS == 31536000
+assert s.SECURE_HSTS_INCLUDE_SUBDOMAINS is True
+assert s.SECURE_HSTS_PRELOAD is True
+assert s.SECURE_CONTENT_TYPE_NOSNIFF is True
+assert s.SECURE_BROWSER_XSS_FILTER is True
+assert s.SESSION_COOKIE_SECURE is True
+assert s.CSRF_COOKIE_SECURE is True
+assert s.SECURE_SSL_REDIRECT is False  # TLS termination lives in the nginx proxy
+assert s.SECURE_PROXY_SSL_HEADER == ("HTTP_X_FORWARDED_PROTO", "https")
+"""
+        proc = self._import(
+            code=check,
+            SECRET_KEY="x",
+            DEBUG="False",
+            ALLOWED_HOSTS="plan.example.org",
+            TRUST_PROXY_HEADERS="True",
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    def test_plain_http_defaults_keep_cookies_usable(self):
+        # no proxy trust (e.g. the NixOS VM tests on plain HTTP): Secure cookies would break clients
+        check = """
+import datefinder.settings as s
+assert s.SESSION_COOKIE_SECURE is False
+assert s.CSRF_COOKIE_SECURE is False
+assert s.SECURE_PROXY_SSL_HEADER is None
+"""
+        proc = self._import(
+            code=check, SECRET_KEY="x", DEBUG="False", ALLOWED_HOSTS="localhost", TRUST_PROXY_HEADERS=""
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+

@@ -49,6 +49,15 @@ nix flake check                    # all three VM checks (slow)
 
 Installed console scripts (from `datefinder/cli.py`): `datefinder-server` (daphne on `HOST`/`PORT`, default 0.0.0.0:8000, serves `datefinder.asgi:application`), `datefinder-manage` / `datefinder` (Django manage).
 
+## Developer Workflow (Branch & PR)
+
+1. **Status check**: `git status` — start from a clean state.
+2. **Branching**: no direct commits to `main`; create `feat/` or `fix/` branches.
+3. **Develop**: use `nix develop` for the environment; keep logic modular.
+4. **Verify**: `nix build` (reproducibility, runs ruff/ty) and `nix build .#test` (integration + unit tests).
+5. **Commit & push**: `git commit -m "type: description"` (Linux-kernel style, explain WHY), then `git push origin <branch>`.
+6. **PR**: open a pull request against `main`.
+
 ## Code Conventions & Common Patterns
 
 - **Views:** function-based only (sole CBV: `health.HealthView`). Stack `@login_required` + `@require_POST`. APIs return `JsonResponse({'success': True, ...})` or `{'error': msg}` with explicit status (400/404/502/503).

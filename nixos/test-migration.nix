@@ -30,6 +30,8 @@ let
     mkdir -p staticfiles
 
     export STATEDIR=$TMPDIR
+    export SECRET_KEY=test-secret-key-for-seed-sqlite
+    export ALLOWED_HOSTS=localhost,127.0.0.1
     python manage.py migrate --settings=datefinder.settings --noinput 2>&1
 
     python manage.py shell --settings=datefinder.settings <<'PYEOF'
