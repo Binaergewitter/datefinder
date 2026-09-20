@@ -3,7 +3,7 @@
 {% block body %}
 <nav class="container-fluid">
     <ul>
-        <li><strong>🎙️ Podcast Date Finder</strong></li>
+        <li><strong>🎙️ Podcast Date Finder</strong> <small>v{{ app_version }}</small></li>
     </ul>
     <ul>
         <li><a href="{% url 'calendar_app:calendar' %}" {% if active_nav == 'calendar' %}aria-current="page"{% endif %}>📅 Calendar</a></li>

@@ -129,6 +129,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "calendar_app.context_processors.registration_settings",
+                "calendar_app.context_processors.app_version",
             ],
         },
     },

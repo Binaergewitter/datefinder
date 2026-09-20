@@ -23,6 +23,8 @@ from django.contrib.auth.models import User
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
+from datefinder import __version__
+
 from .dav import DAV_NS
 from .models import Availability, CalendarKey, Reminder
 from .routing import websocket_urlpatterns
@@ -1897,3 +1899,25 @@ assert s.SECURE_PROXY_SSL_HEADER is None
         )
         self.assertEqual(proc.returncode, 0, proc.stderr)
 
+
+class VersionTest(TestCase):
+    """The single version declaration is consistent and visible in the header."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username="versionuser", password="verpass123")
+
+    def test_header_shows_version(self):
+        self.client.login(username="versionuser", password="verpass123")
+        response = self.client.get(reverse("calendar_app:calendar"))
+        self.assertContains(response, f"v{__version__}")
+
+    def test_version_matches_pyproject(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        pyproject = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn(f'version = "{__version__}"', pyproject)
+
+    def test_version_matches_nix_package(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        package_nix = (repo_root / "nixos" / "package.nix").read_text(encoding="utf-8")
+        self.assertIn(f'version = "{__version__}";', package_nix)
