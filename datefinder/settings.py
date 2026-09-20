@@ -3,6 +3,7 @@ Django settings for datefinder project.
 """
 
 import os
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -18,12 +19,49 @@ STATEDIR = Path(os.getenv("STATEDIR", "/tmp")).resolve()  # there is no reliable
 
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-change-this-in-production")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    # Dev/test convenience: fall back to an insecure key when DEBUG is on or the
+    # Django test runner is active; production (DEBUG off) must provide one.
+    if os.getenv("DEBUG", "").lower() == "true" or (len(sys.argv) >= 2 and sys.argv[1] == "test"):
+        SECRET_KEY = "django-insecure-dev-only-key"
+        import warnings
+
+        # A deployed service with debug=true would silently share this
+        # publicly-known key fleet-wide, making session forgery trivial.
+        warnings.warn("SECRET_KEY not set: using the insecure development key because DEBUG/test mode is active")
+    else:
+        raise ValueError("SECRET_KEY environment variable must be set")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+DEBUG = os.getenv("DEBUG", "").lower() == "true"
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+# Empty ALLOWED_HOSTS only possible when DEBUG (Django then allows localhost) or the test runner.
+ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()]
+if not ALLOWED_HOSTS and not DEBUG:
+    if len(sys.argv) >= 2 and sys.argv[1] == "test":
+        ALLOWED_HOSTS = ["testserver"]
+    else:
+        raise ValueError("ALLOWED_HOSTS must be set in production")
+
+# Security headers (enabled when not in debug mode); each overridable via env so a
+# deployment in front of a TLS proxy can opt out without a code change.
+TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "False").lower() == "true"
+if not DEBUG:
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv("SECURE_HSTS_INCLUDE_SUBDOMAINS", "True").lower() == "true"
+    SECURE_HSTS_PRELOAD = os.getenv("SECURE_HSTS_PRELOAD", "True").lower() == "true"
+    # HTTPS detection relies on SECURE_PROXY_SSL_HEADER (TRUST_PROXY_HEADERS) or nginx
+    # stripping HTTPS for non-local IPs, so HSTS is only sent on genuine HTTPS responses.
+    SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "False").lower() == "true"
+    # Secure cookies only make sense when the app can detect HTTPS (trusted proxy headers);
+    # behind a TLS-terminating proxy this is the production default.
+    _cookie_secure_default = "True" if TRUST_PROXY_HEADERS else "False"
+    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", _cookie_secure_default).lower() == "true"
+    CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", _cookie_secure_default).lower() == "true"
+
 
 # Reverse proxy configuration
 # Set SITE_URL to the external URL when running behind a reverse proxy
@@ -34,9 +72,7 @@ SITE_URL = os.getenv("SITE_URL", "")
 USE_X_FORWARDED_HOST = os.getenv("USE_X_FORWARDED_HOST", "False").lower() == "true"
 
 # Trust the X-Forwarded-Proto header to detect HTTPS
-SECURE_PROXY_SSL_HEADER = (
-    ("HTTP_X_FORWARDED_PROTO", "https") if os.getenv("TRUST_PROXY_HEADERS", "False").lower() == "true" else None
-)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if TRUST_PROXY_HEADERS else None
 
 # CSRF trusted origins - required for HTTPS behind a reverse proxy
 # Automatically add SITE_URL if configured
@@ -93,6 +129,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "calendar_app.context_processors.registration_settings",
+                "calendar_app.context_processors.app_version",
             ],
         },
     },

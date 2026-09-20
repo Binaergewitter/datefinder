@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "datefinder"
-version = "0.1.0"
+version = "1.1.0"
 description = "Podcast Date Finder - A Django app for coordinating podcast recording dates"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -23,6 +23,12 @@ dependencies = [
     "asgiref",
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
+]
+
+[project.optional-dependencies]
+# Test-only dependencies (real CalDAV client integration tests)
+test = [
+  "caldav>=3.0",
 ]
 
 [project.scripts]

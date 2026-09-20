@@ -23,11 +23,17 @@ let
     channels-redis
   ];
 
-  pythonWithDeps = python3.withPackages (_ps: pythonDeps);
+  # test-only deps (imported solely by calendar_app/tests_caldav_client.py);
+  # kept out of `dependencies` so deployments don't carry the CalDAV client lib.
+  pythonTestDeps = with pythonPackages; [
+    caldav
+  ];
+
+  pythonWithDeps = python3.withPackages (_ps: pythonDeps ++ pythonTestDeps);
 
 in pythonPackages.buildPythonApplication {
   pname = "datefinder";
-  version = "0.1.0";
+  version = "1.1.0";
   pyproject = true;
 
   src = ./..;
@@ -42,7 +48,7 @@ in pythonPackages.buildPythonApplication {
   nativeCheckInputs = [
     ruff
     ty
-  ];
+  ] ++ pythonTestDeps;
 
   checkPhase = ''
     runHook preCheck

@@ -38,6 +38,10 @@
           opentelemetry-sdk
           redis
           channels-redis
+          # test-only: real CalDAV client for integration tests (tests_caldav_client.py).
+          # Lives here (not in nixos/package.nix `dependencies`) so the deployed
+          # package closure stays free of it; pyproject mirrors it under [project.optional-dependencies] test.
+          caldav
         ];
 
         pythonWithDeps = python.withPackages (ps: pythonDeps);
@@ -55,6 +59,8 @@
             src = ./.;
           } ''
             export HOME=$TMPDIR
+            export SECRET_KEY=test-secret-key-for-nix-build
+            export ALLOWED_HOSTS=testserver,127.0.0.1,localhost
 
             # Copy source to writable directory
             cp -r $src source

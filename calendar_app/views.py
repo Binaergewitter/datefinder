@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import urllib.error
 import urllib.request
 from datetime import date as date_type
@@ -9,13 +10,16 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
 from django.db.models import Count
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
+from .dav import key_or_session_auth
 from .hooks import run_confirm_hooks, run_unconfirm_hooks
-from .models import Availability, ConfirmedDate, Reminder
+from .models import Availability, CalendarKey, ConfirmedDate, Reminder, _generate_reminder_uid
 
 logger = logging.getLogger(__name__)
 
@@ -375,6 +379,9 @@ def export_ical(request):
     Serve the iCal calendar file.
     No authentication required - nginx will handle caching.
     The file is pre-generated and written to disk on startup and when dates change.
+
+    NOTE: This endpoint is intentionally public for calendar sharing.
+    If this should be protected, add @login_required decorator.
     """
     from pathlib import Path
 
@@ -565,5 +572,256 @@ def api_delete_reminder(request, pk):
         generate_ical_file()
     except Exception as e:
         logger.error(f"Failed to regenerate iCal after deleting reminder: {e}")
+
+    return JsonResponse({"success": True})
+
+
+def _dav_origin(request):
+    if settings.SITE_URL:
+        return settings.SITE_URL.rstrip("/")
+    return request.build_absolute_uri("/").rstrip("/")
+
+
+def _dav_base_url(request):
+    return _dav_origin(request) + "/dav/calendar/"
+
+
+@login_required
+def dav_settings_view(request):
+    """
+    CalDAV/JSON-API settings page: server URL, username, personal calendar key.
+    """
+    return render(
+        request,
+        "calendar_app/dav.html",
+        {
+            "user": request.user,
+            "active_nav": "dav",
+            "dav_url": _dav_base_url(request),
+            "api_base": _dav_origin(request) + "/calendar",
+        },
+    )
+
+
+@login_required
+@require_GET
+def api_get_dav_key(request):
+    """
+    Return the user's CalDAV credentials (key is None until generated).
+    """
+    calendar_key = getattr(request.user, "calendar_key", None)
+    return JsonResponse(
+        {
+            "success": True,
+            "data": {
+                "username": request.user.username,
+                "url": _dav_base_url(request),
+                "key": calendar_key.key if calendar_key else None,
+            },
+        }
+    )
+
+
+@login_required
+@require_POST
+def api_generate_dav_key(request):
+    """
+    Create or rotate the user's calendar key; returns the new key.
+    """
+    key = CalendarKey.generate_for(request.user)
+    return JsonResponse(
+        {
+            "success": True,
+            "data": {
+                "username": request.user.username,
+                "key": key,
+                "url": _dav_base_url(request),
+            },
+        }
+    )
+
+
+_UID_RE = re.compile(r"[A-Za-z0-9._@+-]{1,64}\Z")
+
+# Field caps for the externally-reachable API: Reminder.title is a 200-char
+# CharField (unenforced by save(); Postgres raises DataError instead) and
+# unbounded descriptions inflate every listing and full ICS regeneration.
+MAX_TITLE_LEN = 200
+MAX_DESCRIPTION_LEN = 65535
+
+
+def _entry_dict(reminder):
+    return {
+        "id": reminder.pk,
+        "uid": reminder.uid,
+        "title": reminder.title,
+        "date": reminder.date.isoformat(),
+        "date_display": reminder.date.strftime("%A, %B %d, %Y"),
+        "description": reminder.description,
+        "created_by": reminder.created_by.get_full_name() or reminder.created_by.username
+        if reminder.created_by
+        else "",
+    }
+
+
+def _regenerate_ical_quietly(action):
+    from .ical import generate_ical_file
+
+    try:
+        generate_ical_file()
+    except Exception as e:
+        logger.error(f"Failed to regenerate iCal {action}: {e}")
+
+
+@csrf_exempt
+@key_or_session_auth
+@require_GET
+def api_entry_list(request):
+    """
+    List all reminder entries (Basic username+key or session auth).
+    """
+    return JsonResponse(
+        {"success": True, "data": [_entry_dict(r) for r in Reminder.objects.select_related("created_by").all()]}
+    )
+
+
+@csrf_exempt
+@key_or_session_auth
+@require_POST
+def api_entry_create(request):
+    """
+    Create a reminder entry via the key-authenticated JSON API.
+    """
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    if not isinstance(body, dict):
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    title = str(body.get("title", "")).strip()
+    date_str = str(body.get("date", "")).strip()
+    description = str(body.get("description", "")).strip()
+    uid = str(body.get("uid", "")).strip() or None
+
+    if not title:
+        return JsonResponse({"error": "Title is required"}, status=400)
+    if len(title) > MAX_TITLE_LEN:
+        return JsonResponse({"error": f"Title exceeds {MAX_TITLE_LEN} characters"}, status=400)
+    if len(description) > MAX_DESCRIPTION_LEN:
+        return JsonResponse({"error": f"Description exceeds {MAX_DESCRIPTION_LEN} characters"}, status=400)
+    if not date_str:
+        return JsonResponse({"error": "Date is required"}, status=400)
+
+    try:
+        reminder_date = date_type.fromisoformat(date_str)
+    except ValueError:
+        return JsonResponse({"error": "Invalid date format"}, status=400)
+
+    if uid:
+        if not _UID_RE.match(uid):
+            return JsonResponse({"error": "Invalid UID"}, status=400)
+        if Reminder.objects.filter(uid=uid).exists():
+            return JsonResponse({"error": "UID already exists"}, status=400)
+
+    try:
+        reminder = Reminder.objects.create(
+            title=title,
+            date=reminder_date,
+            description=description,
+            uid=uid or _generate_reminder_uid(),
+            created_by=request.api_user,
+        )
+    except IntegrityError:
+        # Lost a race against a concurrent create/PUT for this uid.
+        return JsonResponse({"error": "UID already exists"}, status=400)
+
+    _regenerate_ical_quietly("after API entry create")
+
+    return JsonResponse({"success": True, "data": _entry_dict(reminder)})
+
+
+@csrf_exempt
+@key_or_session_auth
+@require_POST
+def api_entry_update(request, pk):
+    """
+    Partially update a reminder entry via the key-authenticated JSON API.
+    """
+    try:
+        reminder = Reminder.objects.get(pk=pk)
+    except Reminder.DoesNotExist:
+        return JsonResponse({"error": "Reminder not found"}, status=404)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    if not isinstance(body, dict):
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    # Validate every requested field before mutating so an invalid body
+    # cannot leave a half-applied update on save().
+    if "title" in body:
+        title = str(body["title"] or "").strip()
+        if not title:
+            return JsonResponse({"error": "Title is required"}, status=400)
+        if len(title) > MAX_TITLE_LEN:
+            return JsonResponse({"error": f"Title exceeds {MAX_TITLE_LEN} characters"}, status=400)
+    if "date" in body:
+        try:
+            new_date = date_type.fromisoformat(str(body["date"] or "").strip())
+        except ValueError:
+            return JsonResponse({"error": "Invalid date format"}, status=400)
+    if "description" in body:
+        new_description = str(body["description"] or "").strip()
+        if len(new_description) > MAX_DESCRIPTION_LEN:
+            return JsonResponse({"error": f"Description exceeds {MAX_DESCRIPTION_LEN} characters"}, status=400)
+    if "uid" in body:
+        uid = str(body["uid"] or "").strip()
+        # blank/None means "keep the current uid"; never persist an empty one
+        # (it would break /dav/calendar/<uid>.ics and the unique constraint).
+        if not uid:
+            return JsonResponse({"error": "UID is required"}, status=400)
+        if not _UID_RE.match(uid):
+            return JsonResponse({"error": "Invalid UID"}, status=400)
+        if Reminder.objects.filter(uid=uid).exclude(pk=pk).exists():
+            return JsonResponse({"error": "UID already exists"}, status=400)
+
+    if "title" in body:
+        reminder.title = title
+    if "date" in body:
+        reminder.date = new_date
+    if "description" in body:
+        reminder.description = new_description
+    if "uid" in body:
+        reminder.uid = uid
+
+    try:
+        reminder.save()
+    except IntegrityError:
+        # Lost a uid-uniqueness race after the pre-check above.
+        return JsonResponse({"error": "UID already exists"}, status=400)
+
+    _regenerate_ical_quietly("after API entry update")
+
+    return JsonResponse({"success": True, "data": _entry_dict(reminder)})
+
+
+@csrf_exempt
+@key_or_session_auth
+@require_POST
+def api_entry_delete(request, pk):
+    """
+    Delete a reminder entry via the key-authenticated JSON API.
+    """
+    try:
+        reminder = Reminder.objects.get(pk=pk)
+    except Reminder.DoesNotExist:
+        return JsonResponse({"error": "Reminder not found"}, status=404)
+
+    reminder.delete()
+
+    _regenerate_ical_quietly("after API entry delete")
 
     return JsonResponse({"success": True})

@@ -18,4 +18,11 @@ urlpatterns = [
     path('api/reminders/create/', views.api_create_reminder, name='create_reminder'),
     path('api/reminders/<int:pk>/update/', views.api_update_reminder, name='update_reminder'),
     path('api/reminders/<int:pk>/delete/', views.api_delete_reminder, name='delete_reminder'),
+    path('sync/', views.dav_settings_view, name='dav'),
+    path('api/dav-key/', views.api_get_dav_key, name='get_dav_key'),
+    path('api/dav-key/generate/', views.api_generate_dav_key, name='generate_dav_key'),
+    path('api/entries/', views.api_entry_list, name='entry_list'),
+    path('api/entries/create/', views.api_entry_create, name='entry_create'),
+    path('api/entries/<int:pk>/update/', views.api_entry_update, name='entry_update'),
+    path('api/entries/<int:pk>/delete/', views.api_entry_delete, name='entry_delete'),
 ]
