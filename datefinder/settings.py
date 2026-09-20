@@ -25,6 +25,11 @@ if not SECRET_KEY:
     # Django test runner is active; production (DEBUG off) must provide one.
     if os.getenv("DEBUG", "").lower() == "true" or (len(sys.argv) >= 2 and sys.argv[1] == "test"):
         SECRET_KEY = "django-insecure-dev-only-key"
+        import warnings
+
+        # A deployed service with debug=true would silently share this
+        # publicly-known key fleet-wide, making session forgery trivial.
+        warnings.warn("SECRET_KEY not set: using the insecure development key because DEBUG/test mode is active")
     else:
         raise ValueError("SECRET_KEY environment variable must be set")
 

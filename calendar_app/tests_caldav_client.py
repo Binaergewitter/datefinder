@@ -34,7 +34,8 @@ class CaldavClientIntegrationTest(LiveServerTestCase):
         override = override_settings(ICAL_EXPORT_PATH=str(self.ical_path))
         override.enable()
         self.addCleanup(override.disable)
-        # the WSGI live server reads the same rows this transaction writes.
+        # LiveServerTestCase commits per-test (TransactionTestCase), and Django
+        # shares the same :memory: SQLite connection with the live-server thread.
         self.client_dav = DAVClient(
             self.live_server_url + '/dav/calendar/',
             username=self.user.username,

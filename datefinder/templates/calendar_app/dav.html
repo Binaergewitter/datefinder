@@ -19,7 +19,8 @@ pre.curl-example {
     word-break: break-all;
     font-size: 0.85rem;
 }
-.flash-success { color: var(--pico-color-green-600); }
+.flash-success { color: var(--pico-form-element-valid-border-color, var(--pico-color-green-500)); }
+.flash-error { color: var(--pico-form-element-invalid-border-color, var(--pico-color-red-500)); }
 {% endblock %}
 
 {% block content %}
@@ -120,8 +121,9 @@ function setKey(key) {
     }
 }
 
-function showFlash(text) {
+function showFlash(text, error) {
     flash.textContent = text;
+    flash.className = error ? 'flash-error' : 'flash-success';
     flash.hidden = false;
     setTimeout(() => { flash.hidden = true; }, 4000);
 }
@@ -132,20 +134,25 @@ fetch('/calendar/api/dav-key/')
     .catch(() => {});
 
 generateBtn.addEventListener('click', () => {
+    // Rotate is not idempotent: two concurrent POSTs would leave the newer
+    // key in the DB while the stale response gets displayed — lock until settled.
+    generateBtn.disabled = true;
     fetch('/calendar/api/dav-key/generate/', {
         method: 'POST',
         headers: { 'X-CSRFToken': csrfToken },
     })
-        .then(r => r.json())
+        .then(r => r.json().catch(() => ({})))
         .then(data => {
             if (data.success) {
                 setKey(data.data.key);
                 keyInput.type = 'text';
                 showFlash('✅ Neue Calendar-Key generiert.');
             } else {
-                showFlash('Fehler: ' + (data.error || 'unbekannt'));
+                showFlash('Fehler: ' + (data.error || 'unbekannt'), true);
             }
-        });
+        })
+        .catch(() => showFlash('Fehler: Netzwerkfehler.', true))
+        .finally(() => { generateBtn.disabled = false; });
 });
 
 revealBtn.addEventListener('click', () => {
@@ -155,9 +162,25 @@ revealBtn.addEventListener('click', () => {
 document.querySelectorAll('[data-copy]').forEach(btn => {
     btn.addEventListener('click', () => {
         const input = document.getElementById(btn.dataset.copy);
-        navigator.clipboard.writeText(input.value);
-        showFlash('📋 In Zwischenablage kopiert.');
+        // navigator.clipboard only exists in secure contexts; this deployment
+        // form (plain HTTP) is explicitly supported, so fall back to selection.
+        const done = () => showFlash('📋 In Zwischenablage kopiert.');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(input.value).then(done, () => fallbackCopy(input, done));
+        } else {
+            fallbackCopy(input, done);
+        }
     });
 });
+
+function fallbackCopy(input, done) {
+    input.removeAttribute('readonly');
+    input.select();
+    input.setSelectionRange(0, input.value.length);
+    const ok = document.execCommand && document.execCommand('copy');
+    input.setAttribute('readonly', '');
+    window.getSelection().removeAllRanges();
+    if (ok) done(); else showFlash('Kopieren fehlgeschlagen — Text manuell kopieren.', true);
+}
 </script>
 {% endblock %}

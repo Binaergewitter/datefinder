@@ -118,7 +118,7 @@ pkgs.testers.nixosTest {
     assert avail_count == "0", f"Expected 0 availability before migration, got {avail_count}"
 
     # Run the migration command (needs the same env vars as the systemd service)
-    migrate_env = "DATABASE_URL=postgres:///datefinder DATABASE_SOCKET_DIR=/run/postgresql STATEDIR=/var/lib/datefinder SECRET_KEY=test-secret-key-for-migration-test"
+    migrate_env = "DATABASE_URL=postgres:///datefinder DATABASE_SOCKET_DIR=/run/postgresql STATEDIR=/var/lib/datefinder SECRET_KEY=test-secret-key-for-migration-test ALLOWED_HOSTS=localhost,127.0.0.1"
     machine.succeed(
       f"sudo -u datefinder env {migrate_env} ${self.packages.x86_64-linux.default}/bin/datefinder-manage "
       "migrate_from_sqlite --sqlite-path /tmp/source.sqlite3"

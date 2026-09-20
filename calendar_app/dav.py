@@ -22,8 +22,10 @@ import xml.etree.ElementTree as ElementTree
 from datetime import datetime, timedelta, timezone
 
 from django.contrib.auth.models import User
+from django.db import IntegrityError
 from django.http import HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.middleware.csrf import CsrfViewMiddleware
+from django.utils.http import http_date
 from django.views.decorators.csrf import csrf_exempt
 
 from .ical import _ical_escape, _ical_unescape
@@ -158,6 +160,14 @@ def _unfold(text: str) -> str:
     return "\n".join(logical)
 
 
+def _clean_text(value: str) -> str:
+    # A bare CR inside a value survives the \n line split; stored verbatim it
+    # becomes an ICS line break (RFC 5545 §3.1) and injects fake properties
+    # into every client's view. NUL would corrupt the _ical_unescape
+    # placeholder and is illegal in XML. Strip both at the border.
+    return _ical_unescape(value.replace("\x00", "").replace("\r", ""))
+
+
 def _parse_vevent(body: str):
     """Parse SUMMARY/DESCRIPTION/DTSTART/UID from the first VEVENT; None when absent."""
     unfolded = _unfold(body)
@@ -177,6 +187,10 @@ def _parse_vevent(body: str):
             continue
         name_part, value = line.split(":", 1)
         name = name_part.split(";", 1)[0].strip().upper()
+        if name in ("RRULE", "RDATE", "EXDATE", "RECURRENCE-ID"):
+            # Recurrence would be silently dropped by the single-day model;
+            # reject so clients don't show an event the server never stored.
+            return None
         if name in ("UID", "SUMMARY", "DESCRIPTION", "DTSTART"):
             fields[name] = value
 
@@ -192,8 +206,8 @@ def _parse_vevent(body: str):
 
     return {
         "uid": fields.get("UID", "").strip() or None,
-        "summary": _ical_unescape(fields.get("SUMMARY", "").strip()),
-        "description": _ical_unescape(fields.get("DESCRIPTION", "").strip()),
+        "summary": _clean_text(fields.get("SUMMARY", "").strip()),
+        "description": _clean_text(fields.get("DESCRIPTION", "").strip()),
         "date": date_value,
     }
 
@@ -248,7 +262,8 @@ def _multistatus(responses: list) -> HttpResponse:
 
 
 def _http_date(dt) -> str:
-    return dt.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    # Locale-independent RFC 7231 date (strftime %a/%b follows the process locale).
+    return http_date(dt.timestamp())
 
 
 def _collection_etag(reminders) -> str:
@@ -260,10 +275,12 @@ def _collection_etag(reminders) -> str:
 # Collection view: OPTIONS / PROPFIND / REPORT
 # ---------------------------------------------------------------------------
 
-def _options_response() -> HttpResponse:
+def _options_response(allow: str) -> HttpResponse:
     response = HttpResponse(status=200)
     response["DAV"] = "1, 3, calendar-access"
-    response["Allow"] = "OPTIONS, GET, PUT, DELETE, PROPFIND, REPORT"
+    # Advertise exactly what each endpoint dispatches; a shared blanket list
+    # makes clients negotiate writes the endpoint then rejects with 405.
+    response["Allow"] = allow
     response["MS-Author-Via"] = "DAV"
     return response
 
@@ -294,13 +311,17 @@ def dav_collection(request):
     from .models import Reminder
 
     if request.method == "OPTIONS":
-        return _options_response()
+        return _options_response("OPTIONS, PROPFIND, REPORT")
 
     if request.method == "GET":
         return HttpResponseNotAllowed(["OPTIONS", "PROPFIND", "REPORT"])
 
     if request.method == "PROPFIND":
         depth = request.headers.get("Depth", "infinity")
+        # RFC 4918 §9.5: only 0/1/infinity are defined; fail closed on garbage
+        # instead of silently returning an item-less collection.
+        if depth not in ("0", "1", "infinity"):
+            return HttpResponse("Invalid Depth header", status=400)
         reminders = list(Reminder.objects.all())
         responses = [_collection_propfind_response(reminders)]
         if depth == "1":
@@ -326,10 +347,19 @@ def _localname(tag: str) -> str:
 
 UID_PATH_RE = re.compile(r"[A-Za-z0-9._@+-]{1,64}\Z")
 
-
 def _dav_report(request):
     from .models import Reminder
 
+    declared = request.headers.get("Content-Length")
+    if declared is not None:
+        # Reject by declared length before the body is buffered: chunked
+        # uploads bypass DATA_UPLOAD_MAX_MEMORY_SIZE, so the post-read check
+        # below alone would still let an oversized body stream fully into RAM.
+        try:
+            if int(declared) > MAX_BODY_BYTES:
+                return HttpResponse("Payload too large", status=413)
+        except ValueError:
+            return HttpResponse("Invalid Content-Length", status=400)
     body = request.body
     if len(body) > MAX_BODY_BYTES:
         return HttpResponse("Payload too large", status=413)
@@ -384,8 +414,12 @@ def _dav_report(request):
                     break
         reminders = list(Reminder.objects.all())
         if time_range:
-            start_d = _compact_date(time_range[0])
-            end_d = _compact_date(time_range[1])
+            start_d = _compact_date(time_range[0]) if time_range[0] else None
+            end_d = _compact_date(time_range[1]) if time_range[1] else None
+            # A present-but-malformed filter must not silently widen the
+            # result to the whole collection (RFC 4791 valid-request).
+            if (time_range[0] and start_d is None) or (time_range[1] and end_d is None):
+                return HttpResponse("Invalid time-range", status=400)
             if start_d:
                 reminders = [r for r in reminders if r.date >= start_d]
             if end_d:
@@ -448,14 +482,16 @@ def dav_item(request, uid):
     if not UID_PATH_RE.match(uid):
         return HttpResponse("Not found", status=404)
     if request.method == "OPTIONS":
-        return _options_response()
+        return _options_response("OPTIONS, GET, HEAD, PROPFIND, PUT, DELETE")
 
-    if request.method == "GET":
+    # RFC 9110: HEAD must be supported wherever GET is.
+    if request.method in ("GET", "HEAD"):
         reminder = Reminder.objects.filter(uid=uid).first()
         if reminder is None:
             return HttpResponse("Not found", status=404)
         response = HttpResponse(
-            _serialize_reminder_vevent(reminder), content_type="text/calendar; charset=utf-8"
+            _serialize_reminder_vevent(reminder) if request.method == "GET" else b"",
+            content_type="text/calendar; charset=utf-8",
         )
         response["ETag"] = f'"{_reminder_etag(reminder)}"'
         return response
@@ -486,12 +522,22 @@ def dav_item(request, uid):
         _regenerate_ical("CalDAV delete")
         return HttpResponse(status=204)
 
-    return HttpResponseNotAllowed(["OPTIONS", "GET", "PROPFIND", "PUT", "DELETE"])
+    return HttpResponseNotAllowed(["OPTIONS", "GET", "HEAD", "PROPFIND", "PUT", "DELETE"])
 
 
 def _dav_put(request, uid):
     from .models import Reminder
 
+    declared = request.headers.get("Content-Length")
+    if declared is not None:
+        # Reject by declared length before the body is buffered: chunked
+        # uploads bypass DATA_UPLOAD_MAX_MEMORY_SIZE, so the post-read check
+        # below alone would still let an oversized body stream fully into RAM.
+        try:
+            if int(declared) > MAX_BODY_BYTES:
+                return HttpResponse("Payload too large", status=413)
+        except ValueError:
+            return HttpResponse("Invalid Content-Length", status=400)
     body = request.body
     if len(body) > MAX_BODY_BYTES:
         return HttpResponse("Payload too large", status=413)
@@ -522,20 +568,27 @@ def _dav_put(request, uid):
         return HttpResponse("UID mismatch between body and request path", status=400)
 
     title = parsed["summary"] or "Erinnerung"
+    # CharField max_length is not enforced by save(); an overlong SUMMARY
+    # would 500 with a Postgres DataError instead of a clean 400.
+    if len(title) > 200:
+        return HttpResponse("SUMMARY too long (max 200 characters)", status=400)
     if existing is not None:
         existing.title = title
         existing.date = parsed["date"]
         existing.description = parsed["description"]
         existing.save()
     else:
-        Reminder.objects.create(
-            uid=uid,
-            title=title,
-            date=parsed["date"],
-            description=parsed["description"],
-            created_by=request.dav_user,
-        )
-
+        try:
+            Reminder.objects.create(
+                uid=uid,
+                title=title,
+                date=parsed["date"],
+                description=parsed["description"],
+                created_by=request.dav_user,
+            )
+        except IntegrityError:
+            # Lost a race against a concurrent PUT/JSON-create for this uid.
+            return HttpResponse("Conflict", status=409)
     _regenerate_ical("CalDAV save")
     return HttpResponse(status=204)
 

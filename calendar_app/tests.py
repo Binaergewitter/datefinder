@@ -614,8 +614,8 @@ class ReminderIntegrationTest(TransactionTestCase):
         ical = generate_ical_content()
 
         # Podcast event present
-        self.assertIn("SUMMARY:Bin\\xe4rgewitter Podcast" if False else "SUMMARY:", ical)
-        # Reminder event present
+        self.assertIn("UID:" + ConfirmedDate.objects.get().date.isoformat() + "-podcast@datefinder", ical)
+        self.assertIn("SUMMARY:Binärgewitter Podcast", ical)
         self.assertIn("My Important Reminder", ical)
         self.assertIn("Do not forget", ical)
         # Both are VEVENTs
@@ -914,6 +914,16 @@ class DavProtocolTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("calendar-access", response["DAV"])
         self.assertNotIn("calendar-auto-schedule", response["DAV"])
+        # collection negotiates exactly what it dispatches (PUT would 405)
+        allow = response["Allow"]
+        self.assertIn("PROPFIND", allow)
+        self.assertIn("REPORT", allow)
+        self.assertNotIn("PUT", allow)
+        item = self.client.options(f"/dav/calendar/{self.rem1.uid}.ics", HTTP_AUTHORIZATION=self.auth)
+        item_allow = item["Allow"]
+        for verb in ("GET", "HEAD", "PUT", "DELETE"):
+            self.assertIn(verb, item_allow)
+        self.assertNotIn("REPORT", item_allow)
 
     def test_propfind_depth0_collection(self):
         response = self._propfind("0")
@@ -1218,6 +1228,139 @@ class DavProtocolTest(TestCase):
         )
         self.assertEqual(response.status_code, 413)
 
+    def test_report_over_1mib_413(self):
+        # the REPORT size gate is separate from PUT's; both must reject
+        xml = (
+            '<?xml version="1.0"?><C:calendar-multiget xmlns:D="DAV:" '
+            'xmlns:C="urn:ietf:params:xml:ns:caldav"><D:prop><D:getetag/></D:prop>'
+            "<!--" + "X" * (1024 * 1024 + 10) + "--></C:calendar-multiget>"
+        )
+        response = self._report(xml)
+        self.assertEqual(response.status_code, 413)
+
+    def test_invalid_depth_400(self):
+        # RFC 4918 §9.5: garbage Depth must fail, not silently return depth 0
+        response = self._propfind("nonsense")
+        self.assertEqual(response.status_code, 400)
+
+    def test_report_invalid_timerange_400(self):
+        # a present-but-malformed filter must not widen to the whole collection
+        xml = (
+            '<?xml version="1.0"?><C:calendar-query xmlns:D="DAV:" '
+            'xmlns:C="urn:ietf:params:xml:ns:caldav"><D:prop><D:getetag/></D:prop>'
+            '<C:filter><C:comp-filter name="VCALENDAR"><C:comp-filter name="VEVENT">'
+            '<C:event-filter start="20261301T000000Z"/>'
+            "</C:comp-filter></C:comp-filter></C:filter></C:calendar-query>"
+        )
+        response = self._report(xml)
+        self.assertEqual(response.status_code, 400)
+
+    def test_head_item_supported_with_etag(self):
+        # RFC 9110: HEAD must work wherever GET does (Thunderbird sync probes)
+        get = self.client.get(f"/dav/calendar/{self.rem1.uid}.ics", HTTP_AUTHORIZATION=self.auth)
+        response = self.client.head(f"/dav/calendar/{self.rem1.uid}.ics", HTTP_AUTHORIZATION=self.auth)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["ETag"], get["ETag"])
+        self.assertNotIn(b"BEGIN:VEVENT", response.content)
+
+    def test_item_invalid_uid_404(self):
+        # percent-encoded/traversal-style uids must hit the UID_PATH_RE gate, not the DB
+        for bad in ("..%2f..%2fetc", "a<b>", "x" * 65, "ünicode"):
+            response = self.client.get(f"/dav/calendar/{bad}.ics", HTTP_AUTHORIZATION=self.auth)
+            self.assertEqual(response.status_code, 404, msg=bad)
+
+    def test_report_calendar_data_escapes_xml_metachars(self):
+        # stored titles with markup are echoed inside calendar-data; the whole
+        # multistatus must stay well-formed XML
+        self.rem1.title = "A & B <x>"
+        self.rem1.save()
+        xml = (
+            '<?xml version="1.0"?><C:calendar-query xmlns:D="DAV:" '
+            'xmlns:C="urn:ietf:params:xml:ns:caldav"><D:prop><C:calendar-data/></D:prop>'
+            "</C:calendar-query>"
+        )
+        response = self._report(xml)
+        self.assertEqual(response.status_code, 207)
+        ElementTree.fromstring(response.content)  # raises on malformed XML
+        self.assertIn("A &amp; B &lt;x&gt;", response.content.decode())
+
+    def test_put_rejects_recurrence_400(self):
+        # RRULE would be silently dropped by the single-day model
+        lines = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "BEGIN:VEVENT",
+            "UID:recur1",
+            "DTSTAMP:20260919T120000Z",
+            "DTSTART;VALUE=DATE:20261010",
+            "SUMMARY:Weekly",
+            "RRULE:FREQ=WEEKLY",
+            "END:VEVENT",
+            "END:VCALENDAR",
+        ]
+        response = self.client.put(
+            "/dav/calendar/recur1.ics",
+            "\r\n".join(lines),
+            "text/calendar",
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Reminder.objects.filter(uid="recur1").exists())
+
+    def test_put_bare_cr_injected_line_dropped(self):
+        # a lone CR inside SUMMARY must not survive into the stored value:
+        # re-serialized it becomes an ICS line break (property injection)
+        body = (
+            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\n"
+            "UID:crinject1\r\nDTSTAMP:20260919T120000Z\r\n"
+            "DTSTART;VALUE=DATE:20261011\r\n"
+            "SUMMARY:a\rb\x00c\r\n"
+            "END:VEVENT\r\nEND:VCALENDAR\r\n"
+        )
+        response = self.client.put(
+            "/dav/calendar/crinject1.ics",
+            body,
+            "text/calendar",
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(response.status_code, 204)
+        rem = Reminder.objects.get(uid="crinject1")
+        self.assertEqual(rem.title, "abc")
+        # the regenerated export line must not be splittable by a client parser
+        export = self.ical_path.read_text(encoding="utf-8")
+        self.assertNotIn("SUMMARY:a\r", export)
+
+    def test_put_unescapes_rfc_colon_escape(self):
+        # RFC 5545 requires clients to escape colons in TEXT values
+        body = (
+            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\n"
+            "UID:colon1\r\nDTSTAMP:20260919T120000Z\r\n"
+            "DTSTART;VALUE=DATE:20261012\r\n"
+            "SUMMARY:Meeting: sync\\: standup\r\n"
+            "END:VEVENT\r\nEND:VCALENDAR\r\n"
+        )
+        response = self.client.put(
+            "/dav/calendar/colon1.ics",
+            body,
+            "text/calendar",
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(Reminder.objects.get(uid="colon1").title, "Meeting: sync: standup")
+
+    def test_put_overlong_summary_400(self):
+        # Reminder.title is CharField(max_length=200); save() would 500 on Postgres
+        body = self._event_body("long1", "S" * 201, "", "20261013")
+        response = self.client.put(
+            "/dav/calendar/long1.ics",
+            body,
+            "text/calendar",
+            HTTP_AUTHORIZATION=self.auth,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Reminder.objects.filter(uid="long1").exists())
+
     def test_shared_calendar_visible_to_other_users_key(self):
         # the calendar is shared: another user's key must see (and in this
         # model, edit/delete) every row, not just its owner's.
@@ -1413,6 +1556,41 @@ class EntryApiTest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"], "Title is required")
 
+    def test_create_overlong_title_400(self):
+        # Reminder.title is CharField(max_length=200): Postgres would DataError-500
+        response = self.client.post(
+            reverse("calendar_app:entry_create"),
+            data=json.dumps({"title": "T" * 201, "date": "2026-10-01"}),
+            content_type="application/json",
+            headers={"Authorization": self.auth},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("characters", response.json()["error"])
+        self.assertEqual(Reminder.objects.count(), 0)
+
+    def test_create_huge_description_400(self):
+        # unbounded descriptions inflate every listing and the full ICS rewrite
+        response = self.client.post(
+            reverse("calendar_app:entry_create"),
+            data=json.dumps({"title": "ok", "date": "2026-10-01", "description": "D" * 70000}),
+            content_type="application/json",
+            headers={"Authorization": self.auth},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Reminder.objects.count(), 0)
+
+    def test_update_overlong_title_400(self):
+        rem = Reminder.objects.create(title="Old", date=date(2026, 10, 1), created_by=self.user)
+        response = self.client.post(
+            reverse("calendar_app:entry_update", kwargs={"pk": rem.pk}),
+            data=json.dumps({"title": "T" * 201}),
+            content_type="application/json",
+            headers={"Authorization": self.auth},
+        )
+        self.assertEqual(response.status_code, 400)
+        rem.refresh_from_db()
+        self.assertEqual(rem.title, "Old")
+
     def test_update_partial(self):
         rem = Reminder.objects.create(title="Old", date=date(2026, 10, 1), created_by=self.user)
         response = self.client.post(
@@ -1579,6 +1757,39 @@ class EntryApiTest(TestCase):
                 headers={"Authorization": self.auth},
             )
             self.assertEqual(response.status_code, 405, msg=name)
+
+
+class ReminderUidMigrationTest(TransactionTestCase):
+    """Migration 0004 must backfill a unique uid per pre-existing row.
+
+    The AddField callable default evaluates once per column, so rows that
+    exist before the backfill RunPython would all share one uid and the
+    following AlterField(unique=True) would fail the upgrade in production.
+    """
+
+    def test_backfill_assigns_distinct_uids_to_preexisting_rows(self):
+        from django.core.management import call_command
+        from django.db import connection
+
+        call_command("migrate", "calendar_app", "0003", verbosity=0)
+
+        # legacy rows written at the 0003 schema (no uid column yet)
+        with connection.cursor() as cur:
+            for i in range(3):
+                cur.execute(
+                    "INSERT INTO calendar_app_reminder "
+                    "(title, date, description, created_at, updated_at, created_by_id) "
+                    "VALUES (%s, %s, '', datetime('now'), datetime('now'), NULL)",
+                    [f"Legacy {i}", f"2026-10-0{i + 1}"],
+                )
+
+        call_command("migrate", "calendar_app", verbosity=0)
+
+        uids = list(Reminder.objects.values_list("uid", flat=True))
+        self.assertEqual(len(uids), 3)
+        self.assertEqual(len(set(uids)), 3, f"backfill produced duplicate uids: {uids}")
+        for uid in uids:
+            self.assertRegex(uid, r"^[0-9a-f]{32}$")
 
 
 class CliAutomigrateTest(TestCase):

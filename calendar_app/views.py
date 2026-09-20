@@ -10,6 +10,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
 from django.db.models import Count
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
@@ -642,6 +643,12 @@ def api_generate_dav_key(request):
 
 _UID_RE = re.compile(r"[A-Za-z0-9._@+-]{1,64}\Z")
 
+# Field caps for the externally-reachable API: Reminder.title is a 200-char
+# CharField (unenforced by save(); Postgres raises DataError instead) and
+# unbounded descriptions inflate every listing and full ICS regeneration.
+MAX_TITLE_LEN = 200
+MAX_DESCRIPTION_LEN = 65535
+
 
 def _entry_dict(reminder):
     return {
@@ -699,6 +706,10 @@ def api_entry_create(request):
 
     if not title:
         return JsonResponse({"error": "Title is required"}, status=400)
+    if len(title) > MAX_TITLE_LEN:
+        return JsonResponse({"error": f"Title exceeds {MAX_TITLE_LEN} characters"}, status=400)
+    if len(description) > MAX_DESCRIPTION_LEN:
+        return JsonResponse({"error": f"Description exceeds {MAX_DESCRIPTION_LEN} characters"}, status=400)
     if not date_str:
         return JsonResponse({"error": "Date is required"}, status=400)
 
@@ -713,13 +724,17 @@ def api_entry_create(request):
         if Reminder.objects.filter(uid=uid).exists():
             return JsonResponse({"error": "UID already exists"}, status=400)
 
-    reminder = Reminder.objects.create(
-        title=title,
-        date=reminder_date,
-        description=description,
-        uid=uid or _generate_reminder_uid(),
-        created_by=request.api_user,
-    )
+    try:
+        reminder = Reminder.objects.create(
+            title=title,
+            date=reminder_date,
+            description=description,
+            uid=uid or _generate_reminder_uid(),
+            created_by=request.api_user,
+        )
+    except IntegrityError:
+        # Lost a race against a concurrent create/PUT for this uid.
+        return JsonResponse({"error": "UID already exists"}, status=400)
 
     _regenerate_ical_quietly("after API entry create")
 
@@ -751,6 +766,8 @@ def api_entry_update(request, pk):
         title = str(body["title"] or "").strip()
         if not title:
             return JsonResponse({"error": "Title is required"}, status=400)
+        if len(title) > MAX_TITLE_LEN:
+            return JsonResponse({"error": f"Title exceeds {MAX_TITLE_LEN} characters"}, status=400)
     if "date" in body:
         try:
             new_date = date_type.fromisoformat(str(body["date"] or "").strip())
@@ -758,6 +775,8 @@ def api_entry_update(request, pk):
             return JsonResponse({"error": "Invalid date format"}, status=400)
     if "description" in body:
         new_description = str(body["description"] or "").strip()
+        if len(new_description) > MAX_DESCRIPTION_LEN:
+            return JsonResponse({"error": f"Description exceeds {MAX_DESCRIPTION_LEN} characters"}, status=400)
     if "uid" in body:
         uid = str(body["uid"] or "").strip()
         # blank/None means "keep the current uid"; never persist an empty one
@@ -778,7 +797,11 @@ def api_entry_update(request, pk):
     if "uid" in body:
         reminder.uid = uid
 
-    reminder.save()
+    try:
+        reminder.save()
+    except IntegrityError:
+        # Lost a uid-uniqueness race after the pre-check above.
+        return JsonResponse({"error": "UID already exists"}, status=400)
 
     _regenerate_ical_quietly("after API entry update")
 

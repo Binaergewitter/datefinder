@@ -2,7 +2,7 @@ import secrets
 import uuid
 
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import IntegrityError, models
 
 
 def _generate_reminder_uid():
@@ -73,7 +73,12 @@ class CalendarKey(models.Model):
     def generate_for(cls, user):
         """Create or rotate the user's CalDAV key; returns the new key string."""
         key = secrets.token_hex(20)
-        cls.objects.update_or_create(user=user, defaults={'key': key})
+        try:
+            cls.objects.update_or_create(user=user, defaults={'key': key})
+        except IntegrityError:
+            # update_or_create is not atomic: a concurrent rotation lost the
+            # insert race on the unique user column — adopt its row instead.
+            cls.objects.filter(user=user).update(key=key)
         return key
 
 

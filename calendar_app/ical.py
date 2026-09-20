@@ -30,11 +30,12 @@ def _ical_escape(text: str) -> str:
 
 
 def _ical_unescape(text: str) -> str:
-    """Inverse of _ical_escape.
+    """Inverse of _ical_escape; also accepts the RFC 5545 colon escape.
 
-    Naive sequential replace like the escaper: text containing a literal
-    backslash before 'n' round-trips imperfectly. Order matters: the
-    literal-backslash placeholder goes in first and is restored last.
+    Standards-compliant CalDAV clients escape every literal colon in TEXT
+    values (RFC 5545 3.3.11), which our own escaper never emits — without
+    the `\\:` rule the backslash would persist into the stored value.
+    The literal-backslash placeholder goes in first and is restored last.
     """
     if not text:
         return ""
@@ -42,6 +43,7 @@ def _ical_unescape(text: str) -> str:
     text = text.replace("\\n", "\n")
     text = text.replace("\\,", ",")
     text = text.replace("\\;", ";")
+    text = text.replace("\\:", ":")
     text = text.replace("\x00", "\\")
     return text
 
@@ -128,8 +130,9 @@ def generate_ical_content() -> str:
         start_utc = start_dt.astimezone(utc)
         end_utc = end_dt.astimezone(utc)
 
-        # UID includes pk since reminder dates are not unique
-        uid = f"{reminder.date.isoformat()}-reminder-{reminder.pk}@datefinder"
+        # Same UID as the CalDAV representation: subscribers and CalDAV
+        # clients must see one event, not two, when an entry moves date.
+        uid = reminder.uid
 
         dtstart = start_utc.strftime("%Y%m%dT%H%M%SZ")
         dtend = end_utc.strftime("%Y%m%dT%H%M%SZ")
