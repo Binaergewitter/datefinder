@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: DeterminateSystems/magic-nix-cache-action@v9
+
+      # Package build (checkPhase also runs ruff check + ty check).
+      - name: Build package
+        run: nix build -L .#datefinder
+
+      # Unit/integration tests on SQLite (no VM tests here; those are covered
+      # by `nix flake check`, which is too slow for per-PR CI).
+      - name: Run tests
+        run: nix build -L .#test
